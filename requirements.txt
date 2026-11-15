@@ -1,0 +1,10 @@
+# Python 3.10 or newer. All packages have ready-made wheels for Windows and Linux.
+numpy>=1.24
+scipy>=1.10
+scikit-image>=0.22
+opencv-python-headless>=4.8
+tifffile>=2023.7.10
+imagecodecs>=2023.7.10     # compressed TIFFs (LZW, deflate, JPEG)
+PyYAML>=6.0
+tqdm>=4.60                 # progress bar
+pytest>=7.0                # tests

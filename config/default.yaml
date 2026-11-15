@@ -1,0 +1,82 @@
+# Seed counter settings. All values can be overridden per run on the command line
+# (see MANUAL.md, section 20). Lengths marked "seed radii" scale with the seed size.
+
+input:
+  extensions: [".tif", ".tiff"]
+  recursive: false              # also look in sub-folders of the input directory
+
+processing:
+  work_scale: 0.5               # images are analysed at this fraction of full size (speed)
+  seed_radius_px: 26            # expected seed radius at full resolution, in pixels
+  auto_radius: true             # re-estimate the seed size per image if it differs a lot
+  auto_radius_tolerance: 0.30   # re-run only if the estimate differs by more than 30 %
+
+pods:
+  saturation_margin: 30         # pod = pixels this much more saturated than the white background
+  min_area_frac: 0.2            # ignore objects smaller than 20 % of the largest pod
+  left_body_frac: 0.6           # bud end: seeds start where the pod reaches 60 % of its width
+  right_body_frac: 0.6          # stem end: pod ends where its width drops below 60 %
+  bud_frac: 0.5                 # never look for seeds within 0.5 pod widths of the bud tip
+  end_margin: 1.0               # extra margin at both ends, in seed radii
+  rim_frac: 0.03                # margin inside the pod wall, as a fraction of pod width
+  max_tilt_deg: 25              # warn if a pod is tilted more than this
+
+contrast:
+  pre_blur: 1.5                  # Gaussian blur before contrast (pixels at work scale)
+  background_size: 3.0          # size of the pod-background estimate, in seed radii
+
+segmentation:
+  peak_sigma: 0.2               # smoothing for seed centres, in seed radii
+  dog_sigma: 1.0                # background scale for local contrast, in seed radii
+  min_distance: 0.4              # minimum distance between seed centres, in seed radii
+  peak_contrast: 0.02           # minimum local contrast of a seed centre
+  seed_threshold: 0.2           # minimum relative darkness of seed pixels
+  min_area: 0.3                 # smallest seed, as a fraction of the expected seed area
+  split_area: 1.3               # objects larger than this (x expected area) ...
+  split_side: 0.35              # ... with this share on both sides of the centerline are split
+  split_offset: 0.3             # ... if each side has its own dark centre this far from the line, in seed radii
+  split_dip: 0.05               # ... and the gap between the two centres is this much lighter
+  split_area_large: 2.2         # objects this large are split across the centerline even without a second centre
+
+confidence:
+  review_threshold: 0.70        # >= this: green seed / pod "no"
+  reject_threshold: 0.40        # <  this: red seed / pod "yes"; in between: orange / "maybe"
+  # Seed confidence = logistic model over the features below (fitted by scripts/calibrate.py)
+  seed_model:
+    intercept: 2.7184
+    contrast: 2.7462                # relative darkness of the seed vs. typical seeds in the image
+    size_deviation: -1.0615         # |log(area / expected area)|
+    solidity_deficit: -10.1441      # 1 - solidity (irregular outlines)
+    centerline_cross: -9.7378       # share of the seed on the other side of the centerline
+    split: -2.6435                  # seed created by splitting a merged object
+    end_proximity: -9.5702          # closeness to the bud / stem cut
+  # Pod confidence = 1 - estimated relative count error / error_tolerance
+  pod_error_tolerance: 0.25
+  uncovered_weight: 0.8         # how much an unexplained seed-sized dark area counts as a missed seed
+  missing_end_penalty: 2.0      # seeds' worth of uncertainty when the bud or stem is outside the image
+
+render:
+  scale: 1.0                    # size of the annotated PNG relative to the original image
+  line_width: 3
+  thumbnail_width: 900          # thumbnail embedded in report.html
+
+output:
+  report_html: true
+  run_summary_csv: true
+  pods_csv: true
+  report_outline_csv: true
+  annotated_png: true
+  seeds_csv: false              # optional per-seed table
+  results_json: run             # run = run settings + summary only; full = every pod and seed; off = none
+
+calibration:                    # used by scripts/calibrate.py
+  sweep:
+    segmentation.peak_sigma: [0.15, 0.2, 0.25]
+    segmentation.min_distance: [0.35, 0.4, 0.5]
+    segmentation.seed_threshold: [0.16, 0.2, 0.24]
+    contrast.pre_blur: [1.0, 1.5, 2.0]
+  count_weight: 1.0             # score = count_weight * per-pod count error - f1_weight * seed F1
+  f1_weight: 60.0               #         - border_weight * border overlap (when redrawn borders exist)
+  border_weight: 40.0
+  border_sources: [redrawn]     # which borders teach border shape: redrawn (in the review);
+                                # add "annotations" to also use the hand-drawn outlines in ground_truth/

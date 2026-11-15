@@ -1,0 +1,1113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seed review</title>
+<style>
+:root{
+  --bg:#f3f4f0;--surface:#ffffff;--ink:#1f2620;--muted:#5d665e;--line:#dcdfd6;--stage:#e4e6df;
+  --pod:#d8c27a;--g:#2f8a3e;--o:#d97a16;--r:#c43b30;--m:#b400b4;--link:#2d5f8a;--sel:#2d5f8a;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#161916;--surface:#1f231f;--ink:#e7eae3;--muted:#a2aa9f;--line:#343a33;--stage:#0f110f;
+  --pod:#b9a35c;--g:#5cbf6a;--o:#f0a04b;--r:#ee6d62;--m:#e070e0;--link:#8fb8dc;--sel:#8fb8dc;color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.45 "Segoe UI","Noto Sans","Helvetica Neue",Arial,sans-serif;
+  font-variant-numeric:tabular-nums;display:grid;grid-template-rows:auto 1fr;overflow:hidden}
+button{font:inherit;color:inherit;background:var(--surface);border:1px solid var(--line);border-radius:5px;
+  padding:5px 10px;cursor:pointer}
+button:hover:not(:disabled){border-color:var(--muted)}
+button:disabled{opacity:.45;cursor:default}
+button.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+:focus-visible{outline:2px solid var(--sel);outline-offset:2px}
+kbd{font:12px/1 inherit;border:1px solid var(--line);border-bottom-width:2px;border-radius:3px;padding:1px 4px;color:var(--muted)}
+
+header{display:flex;align-items:center;gap:18px;padding:8px 14px;border-bottom:1px solid var(--line);background:var(--surface);flex-wrap:wrap}
+header h1{font-size:17px;margin:0;font-weight:650;padding-left:10px;border-left:5px solid var(--pod)}
+.thr{display:flex;align-items:center;gap:8px;color:var(--muted)}
+.thr input[type=range]{width:110px}
+.thr output{min-width:2.6em;color:var(--ink)}
+.spacer{flex:1}
+
+.app{display:grid;grid-template-columns:240px 1fr 380px;min-height:0}
+aside,section.panel{background:var(--surface);overflow:auto;min-height:0}
+aside{border-right:1px solid var(--line)}
+section.panel{border-left:1px solid var(--line);padding:12px 14px 30px}
+.list{list-style:none;margin:0;padding:6px}
+.list li button{width:100%;text-align:left;border:0;border-left:4px solid transparent;border-radius:4px;padding:7px 8px;display:grid;
+  grid-template-columns:1fr auto;gap:2px 6px;background:none}
+.list li button[aria-current=true]{background:var(--bg)}
+.list li button[data-status=yes],.list li button[data-status=error]{border-left-color:var(--r)}
+.list li button[data-status=maybe]{border-left-color:var(--o)}
+.list li button[data-status=no]{border-left-color:var(--g)}
+.list .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.list .meta{grid-column:1/3;color:var(--muted);font-size:12px}
+.done{color:var(--g);font-weight:700}
+
+.stage{position:relative;background:var(--stage);min-width:0;min-height:0;overflow:hidden}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+.stage.add canvas{cursor:crosshair}
+.tools{position:absolute;top:10px;left:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;
+  background:color-mix(in srgb,var(--surface) 92%,transparent);border:1px solid var(--line);border-radius:7px;padding:6px}
+.tools .sep{width:1px;height:22px;background:var(--line)}
+.tools label{display:flex;gap:4px;align-items:center;color:var(--muted);font-size:13px;padding:0 4px}
+.zoom{position:absolute;bottom:10px;left:10px;color:var(--muted);font-size:12px;background:var(--surface);
+  border:1px solid var(--line);border-radius:4px;padding:2px 6px}
+.empty-state{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:6px;text-align:center;color:var(--muted);padding:20px}
+.empty-state[hidden]{display:none}
+.empty-state .big{font-size:20px;font-weight:650;color:var(--ink);margin:0}
+.empty-state p{margin:0 0 6px}
+.loading{position:absolute;inset:0;display:none;place-items:center;color:var(--muted)}
+.stage.busy .loading{display:grid}
+
+.panel h2{font-size:15px;margin:2px 0 8px;font-weight:650;word-break:break-all}
+.panel h3{font-size:13px;margin:18px 0 6px;color:var(--muted);font-weight:600}
+.chip{display:inline-block;min-width:50px;text-align:center;border-radius:999px;padding:0 9px;font-size:12px;font-weight:600;border:1.5px solid currentColor}
+.chip.no{color:var(--g)}.chip.maybe{color:var(--o)}.chip.yes,.chip.error{color:#fff;background:var(--r);border-color:var(--r)}
+.bar{display:inline-flex;width:72px;height:9px;border-radius:3px;overflow:hidden;vertical-align:middle;background:var(--line)}
+.bar i{display:block;height:100%}.bar .g{background:var(--g)}.bar .o{background:var(--o)}.bar .r{background:var(--r)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}
+.notes p{margin:6px 0;color:var(--muted);font-size:13px}
+.card{border:1px solid var(--line);border-radius:6px;padding:10px;background:var(--bg)}
+.card .empty{color:var(--muted)}
+.card dl{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin:6px 0 10px}
+.card dt{color:var(--muted)}.card dd{margin:0}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+.dot.green{background:var(--g)}.dot.orange{background:var(--o)}.dot.red{background:var(--r)}.dot.rejected{background:var(--muted)}.dot.area{background:var(--m)}
+table{border-collapse:collapse;width:100%}
+th,td{text-align:left;padding:5px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--muted);font-weight:600;font-size:12px}
+td.n{text-align:right}
+tbody tr{cursor:pointer}tbody tr:hover{background:var(--bg)}
+tr.reason td{white-space:normal;color:var(--muted);font-size:12px;padding-top:0;cursor:default}
+.next{width:100%;margin-top:8px}
+.keys{color:var(--muted);font-size:13px;columns:2;padding-left:0;list-style:none;margin:0}
+.keys li{margin:3px 0;break-inside:avoid}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);
+  padding:8px 14px;border-radius:6px;max-width:80vw;opacity:0;transition:opacity .2s;pointer-events:none}
+#toast.show{opacity:1}#toast.err{background:var(--r);color:#fff}
+.overview{position:absolute;inset:0;background:var(--bg);overflow:auto;padding:16px 20px;z-index:5}
+.overview[hidden]{display:none}
+.overview .top{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.overview .big{font-size:20px;font-weight:650}
+.overview table{background:var(--surface)}
+.overview th{cursor:pointer;user-select:none}
+.overview th[aria-sort]::after{content:" \25BE";color:var(--muted)}
+.overview th[aria-sort=ascending]::after{content:" \25B4"}
+.progress{width:220px;height:8px;background:var(--line);border-radius:4px;overflow:hidden;display:inline-block;vertical-align:middle}
+.progress i{display:block;height:100%;background:var(--g)}
+dialog{border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);max-width:560px;width:92vw;padding:18px 20px}
+dialog::backdrop{background:rgba(0,0,0,.35)}
+dialog h2{margin:0 0 8px;font-size:17px}
+dialog p{margin:6px 0;color:var(--muted)}
+dialog label{display:flex;gap:8px;align-items:center;margin:6px 0}
+dialog table{margin:8px 0}
+.mini{font-size:12px;color:var(--muted)}
+dialog.wide{max-width:1100px}
+.drop{display:grid;place-items:center;border:2px dashed var(--line);border-radius:8px;padding:28px;margin:10px 0;cursor:pointer;color:var(--muted)}
+.drop.over{border-color:var(--sel);color:var(--ink)}
+.pick{display:flex;gap:14px;align-items:end;flex-wrap:wrap;margin:10px 0}
+.pick label{display:grid;gap:4px;margin:0;color:var(--muted)}
+.annview{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px;align-items:start}
+.annview img{width:100%;border:1px solid var(--line);border-radius:4px}
+.annview input[type=number]{width:70px;font:inherit;color:inherit;background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:3px 5px}
+.ok{color:var(--g);font-weight:700}.bad{color:var(--r);font-weight:600}
+@media (max-width:900px){.annview{grid-template-columns:1fr}}
+select{font:inherit;color:inherit;background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:4px 6px}
+@media (max-width:1200px){.app{grid-template-columns:200px 1fr 340px}}
+@media (prefers-reduced-motion:reduce){#toast{transition:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Seed review</h1>
+  <div class="thr" title="Seeds at or above this confidence are green; pods at or above it need no review">
+    <label for="thrReview">Review threshold</label><input id="thrReview" type="range" min="0" max="1" step="0.01"><output id="thrReviewV"></output>
+  </div>
+  <div class="thr" title="Seeds below this confidence are red; pods below it need review">
+    <label for="thrReject">Reject threshold</label><input id="thrReject" type="range" min="0" max="1" step="0.01"><output id="thrRejectV"></output>
+  </div>
+  <div class="spacer"></div>
+  <button id="addImgBtn" title="Add TIFF images to the input folder">Add images</button>
+  <button id="addAnnBtn" title="Add a raw image with its annotated copy as ground truth">Add annotation</button>
+  <button id="ovBtn" data-tip="All images at a glance, with progress" data-ka="overview">Overview</button>
+  <button id="learnBtn" title="Improve the automatic counting from the images you have checked">Learn from reviews</button>
+  <button id="undo" data-tip="Undo the last change to this image" data-ka="undo">Undo</button>
+  <button id="export" class="primary" title="Write report, tables and annotated images with your corrections">Save results</button>
+</header>
+
+<div class="app">
+  <aside aria-label="Images"><ul class="list" id="list"></ul></aside>
+
+  <div class="stage" id="stage">
+    <canvas id="cv" aria-label="Pod image with seed outlines"></canvas>
+    <div class="tools" role="toolbar" aria-label="View tools">
+      <button id="mSelect" class="on" data-tip="Select seeds, dark areas and pods" data-ka="select_mode">Select</button>
+      <button id="mAdd" data-tip="Draw a missed seed: drag an ellipse over it" data-ka="add_mode">Add seed</button>
+      <button id="mSplit" data-tip="Two seeds in one border: drag a line through it where they meet" data-ka="split_mode">Split seed</button>
+      <button id="mRedraw" data-tip="Wrong border: select a seed, then trace its correct outline" data-ka="redraw_mode">Redraw border</button>
+      <span class="sep"></span>
+      <button id="fit" data-tip="Show the whole image" data-ka="fit">Fit</button>
+      <span class="sep"></span>
+      <label><input type="checkbox" id="lSeeds" checked> Seeds</label>
+      <label><input type="checkbox" id="lGuides" checked> Centerline and cuts</label>
+      <label><input type="checkbox" id="lAreas" checked> Dark areas</label>
+      <label><input type="checkbox" id="lRejected" checked> Rejected</label>
+    </div>
+    <div class="zoom" id="zoom"></div>
+    <div class="overview" id="overview" hidden>
+      <div class="top">
+        <span class="big" id="ovHead"></span><span class="progress"><i id="ovProg"></i></span>
+        <label>Show <select id="ovFilter">
+          <option value="all">all images</option><option value="unchecked">not checked</option>
+          <option value="review">needing review</option><option value="red">with red seeds</option>
+          <option value="edited">edited</option></select></label>
+        <span class="spacer"></span><button id="ovClose">Back to image <span data-kbd="overview"></span></button>
+      </div>
+      <p class="mini" id="ovAcc"></p>
+      <table><thead><tr>
+        <th data-k="key">Image</th><th data-k="status">Needs review</th><th data-k="reviewed">Checked</th>
+        <th data-k="seeds">Seeds</th><th data-k="auto_seeds">Automatic</th><th data-k="change">Change</th>
+        <th data-k="todo">Orange / red</th><th data-k="pods_flagged">Flagged pods</th><th data-k="redrawn" title="seeds whose border you redrew; only these teach border shape">Redrawn</th><th data-k="edits">Edits</th>
+      </tr></thead><tbody id="ovBody"></tbody></table>
+    </div>
+    <div class="loading">Loading image</div>
+    <div class="empty-state" id="emptyState" hidden>
+      <p class="big">No images yet</p>
+      <p>Add TIFF images to start reviewing. They are copied into the input folder and analysed.</p>
+      <button class="primary" id="emptyAdd">Add images</button>
+    </div>
+  </div>
+
+  <section class="panel" aria-label="Details">
+    <h2 id="imgName">No image</h2>
+    <div class="row"><span id="imgChip"></span><span id="imgCount"></span></div>
+    <div class="row"><span id="imgBar"></span></div>
+    <div class="mini" id="imgAuto"></div>
+    <div class="notes" id="notes"></div>
+    <div class="row">
+      <button id="checked" data-tip="Mark the whole image as checked" data-ka="toggle_checked">Mark image as checked</button>
+      <button id="discard" title="Remove all your changes to this image and analyse it again">Discard edits</button>
+    </div>
+
+    <h3>Selection</h3>
+    <div class="card" id="sel"></div>
+    <button class="next" id="next" data-tip="Go to the next orange or red seed or dark area" data-ka="next">Next to check</button>
+    <label class="row" style="color:var(--muted)"><input type="checkbox" id="advance" checked> Go to the next one after each decision</label>
+
+    <h3>Pods</h3>
+    <table><thead><tr><th>Pod</th><th>Seeds</th><th title="automatic count and change">Auto</th><th>G / O / R</th><th>Conf.</th><th>Review</th></tr></thead>
+      <tbody id="pods"></tbody></table>
+
+    <h3>Keys</h3>
+    <ul class="keys" id="keysList"></ul>
+    <p class="mini">Shortcuts can be changed in config/keybindings.yaml (reload the page afterwards).</p>
+  </section>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+<dialog id="addImg" aria-labelledby="addImgTitle">
+  <h2 id="addImgTitle">Add images</h2>
+  <p>TIFF files are copied into the input folder and analysed. They then appear in the image list.</p>
+  <label class="drop" id="imgDrop" tabindex="0">
+    <input type="file" id="imgFiles" accept=".tif,.tiff" multiple hidden>
+    <span>Drop .tif files here, or <u>choose files</u></span>
+  </label>
+  <div id="imgStatus"></div>
+  <div class="row" style="justify-content:flex-end;margin-top:12px"><button id="imgClose">Close</button></div>
+</dialog>
+<dialog id="addAnn" aria-labelledby="addAnnTitle" class="wide">
+  <h2 id="addAnnTitle">Add annotation</h2>
+  <p>Choose the raw TIFF and its annotated copy (the full image, with closed white outlines around the seeds), then
+  type the number of seeds in each pod. The program counts the outlined shapes per pod and compares them with your counts.</p>
+  <div class="pick">
+    <label>Raw image (.tif) <input type="file" id="annRaw" accept=".tif,.tiff"></label>
+    <label>Annotated image <input type="file" id="annImg" accept=".png,.jpg,.jpeg,.tif,.tiff,.bmp"></label>
+    <button id="annCheck" class="primary" disabled>Check</button>
+  </div>
+  <div id="annResult"></div>
+  <div class="row" style="justify-content:flex-end;margin-top:12px">
+    <button id="annClose">Close</button><button id="annSave" class="primary" hidden>Save annotation</button>
+  </div>
+  <h3 style="margin-top:16px">Annotations in the ground-truth folder</h3>
+  <div id="annList" class="mini"></div>
+</dialog>
+<dialog id="learn" aria-labelledby="learnTitle">
+  <h2 id="learnTitle">Learn from reviews</h2>
+  <p>Images you marked as checked become ground truth: your accepted, rejected, split and added seeds show the
+  program which seeds are right, and the borders you redrew show it the right seed shapes (accepting a seed does
+  not count as approving its border). The settings are then tuned on them (together with the annotations in ground_truth/).</p>
+  <label><input type="checkbox" id="lnGt" checked> Also use the annotated images in ground_truth/</label>
+  <label><input type="checkbox" id="lnSweep" checked> Also tune the detection settings (slower; otherwise only the confidence colours)</label>
+  <div id="lnBody"></div>
+  <div class="row" style="justify-content:flex-end;margin-top:12px">
+    <button id="lnClose">Close</button><button id="lnApply" hidden>Use the new settings</button><button id="lnStart" class="primary">Start</button>
+  </div>
+</dialog>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const cv = $("cv"), ctx = cv.getContext("2d"), stage = $("stage");
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const S = {
+  images: [], totals: null, id: null, cur: null, img: null, thr: {review: 0.7, reject: 0.4},
+  view: {scale: 1, ox: 0, oy: 0}, mode: "select", sel: null, drag: null, draw: null, line: null,
+  paths: new Map(), ovSort: {k: "status", dir: -1},
+};
+const MODES = {select: "mSelect", add: "mAdd", split: "mSplit", redraw: "mRedraw"};
+const HINT = {
+  select: "Click a seed, a dashed dark area or an empty part of a pod.",
+  add: "Drag an ellipse over a missed seed inside a pod.",
+  split: "Drag a line through a seed where its two parts meet.",
+  redraw: "Trace the correct border around the selected seed in one stroke; releasing the mouse closes it.",
+  splitpod: "Drag a line through the pod where the two pods should be separated.",
+  cutbud: "Click in the pod where the bud cut should be. Nothing left of it is counted.",
+  cutstem: "Click in the pod where the stem cut should be. Nothing right of it is counted.",
+};
+
+// ------------------------------------------------------------------ keyboard shortcuts (config/keybindings.yaml)
+let KEYS = {}, KEYDESC = {}, KEYMAP = new Map();
+function keyLabel(k) { return k.replace("Delete", "Del").replace("Escape", "Esc").replace("Backspace", "Bksp").replace(/\+(?=.)/g, " "); }
+function K(action) { const ks = KEYS[action] || []; return ks.length ? `<kbd>${esc(keyLabel(ks[0]))}</kbd>` : ""; }
+function keyText(action) { const ks = KEYS[action] || []; return ks.length ? keyLabel(ks[0]) : ""; }
+function comboOf(e) {
+  let k = e.key === " " ? "Space" : e.key;
+  const letter = k.length === 1 && /[a-z]/i.test(k), named = k.length > 1;
+  const parts = [];
+  if (e.ctrlKey || e.metaKey) parts.push("Ctrl");
+  if (e.altKey) parts.push("Alt");
+  if (e.shiftKey && (letter || named)) parts.push("Shift");
+  parts.push(k.length === 1 ? k.toUpperCase() : k);
+  return parts.join("+");
+}
+async function loadKeys() {
+  try {
+    const d = await api("/api/keybindings");
+    KEYS = d.bindings; KEYDESC = d.descriptions;
+    KEYMAP = new Map();
+    for (const [a, ks] of Object.entries(KEYS)) for (const k of ks) KEYMAP.set(k, a);
+    d.warnings.forEach(w => console.warn(w));
+    if (d.warnings.length) toast(`Shortcut file: ${d.warnings[0]}${d.warnings.length > 1 ? ` (and ${d.warnings.length - 1} more, see the browser console)` : ""}`, true);
+  } catch (err) { toast("Shortcuts could not be loaded: " + err.message, true); }
+  document.querySelectorAll("[data-ka]").forEach(el => { const t = keyText(el.dataset.ka); el.title = el.dataset.tip + (t ? ` (${t})` : ""); });
+  document.querySelectorAll("[data-kbd]").forEach(el => el.innerHTML = K(el.dataset.kbd));
+  $("keysList").innerHTML = Object.entries(KEYDESC).filter(([a]) => (KEYS[a] || []).length)
+    .map(([a, d]) => `<li>${KEYS[a].map(k => `<kbd>${esc(keyLabel(k))}</kbd>`).join(" ")} ${esc(d)}</li>`).join("")
+    + "<li>Wheel: zoom</li><li>Drag: move</li>";
+}
+
+// ------------------------------------------------------------------ server calls
+function q() { return `review=${S.thr.review}&reject=${S.thr.reject}`; }
+async function api(path, opts = {}) {
+  const r = await fetch(path + (path.includes("?") ? "&" : "?") + q(), opts);
+  const data = await r.json().catch(() => ({error: `HTTP ${r.status}`}));
+  if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+  return data;
+}
+const post = (path, body) => api(path, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body || {})});
+function toast(msg, err = false) {
+  const t = $("toast"); t.textContent = msg; t.className = "show" + (err ? " err" : "");
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.className = err ? "err" : "", err ? 5000 : 2500);
+}
+
+// ------------------------------------------------------------------ loading
+async function loadList() {
+  const d = await api("/api/images");
+  S.images = d.images; S.totals = d.totals; S.outputDir = d.output_dir;
+  renderList(); if (!$("overview").hidden) renderOverview();
+}
+async function openImage(id, keepView = false) {
+  if (id < 0 || id >= S.images.length) return;
+  const changed = id !== S.id;
+  S.id = id; if (changed) S.sel = null;
+  stage.classList.add("busy");
+  try {
+    const p = await api(`/api/image/${id}`);
+    setPayload(p);
+    if (changed) {
+      const img = new Image();
+      img.src = `/api/image/${id}/picture`;
+      await img.decode();
+      if (S.id !== id) return;
+      S.img = img;
+    }
+    if (changed || !keepView) fit();
+  } catch (e) { toast(e.message, true); }
+  finally { stage.classList.remove("busy"); }
+  renderList(); draw();
+}
+function setPayload(p) {
+  S.cur = p;
+  S.paths = new Map();
+  for (const pod of p.pods) {
+    S.paths.set("p:" + pod.index, path2d(pod.outline));
+    for (const s of pod.seeds) S.paths.set("s:" + s.id, path2d(s.contour));
+    for (const u of pod.uncovered) S.paths.set(`a:${pod.index}:${u.area}`, path2d(u.contour));
+  }
+  const li = S.images.find(x => x.id === p.id);
+  if (li) Object.assign(li, {seeds: p.summary.seeds, needs_review: p.summary.needs_review, reviewed: p.reviewed,
+    edits: p.edits, orange: p.summary.orange, red: p.summary.red, pods: p.summary.pods});
+  validateSel(); renderPanel(); renderList();
+}
+function path2d(pts, close = true) {
+  const p = new Path2D();
+  pts.forEach(([x, y], i) => i ? p.lineTo(x, y) : p.moveTo(x, y));
+  if (close) p.closePath(); return p;
+}
+
+// ------------------------------------------------------------------ edits
+async function edit(e, advance = false) {
+  if (!S.cur) return false;
+  try {
+    const before = new Set(allSeeds().map(s => s.id));
+    setPayload(await post(`/api/image/${S.id}/edit`, e));
+    if (e.op === "add") {
+      const added = allSeeds().find(s => !before.has(s.id));
+      if (added) S.sel = {type: "seed", id: added.id};
+    }
+    if (e.op === "split") S.sel = null;
+    if (advance && $("advance").checked) nextToCheck(1, true); else renderSel();
+    draw(); loadList();
+    return true;
+  } catch (err) { toast(err.message, true); return false; }
+}
+async function undo() {
+  if (!S.cur || !S.cur.edits) return toast("Nothing to undo for this image");
+  try { setPayload(await post(`/api/image/${S.id}/undo`)); draw(); loadList(); toast("Undone"); }
+  catch (err) { toast(err.message, true); }
+}
+
+// ------------------------------------------------------------------ geometry
+function allSeeds() { return S.cur ? S.cur.pods.flatMap(p => p.seeds) : []; }
+function findSeed(id) { for (const p of S.cur.pods) for (const s of p.seeds) if (s.id === id) return [p, s]; return [null, null]; }
+function findPod(k) { return S.cur.pods.find(p => p.index === k); }
+function inPoly(x, y, pts) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [xi, yi] = pts[i], [xj, yj] = pts[j];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+function toImage(px, py) { const v = S.view; return [(px - v.ox) / v.scale, (py - v.oy) / v.scale]; }
+function bboxOf(pts) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const [x, y] of pts) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+  return [x0, y0, x1, y1];
+}
+function centroidOf(pts) { let x = 0, y = 0; for (const p of pts) { x += p[0]; y += p[1]; } return [x / pts.length, y / pts.length]; }
+function visibleSeed(s) { return s.cls !== "split" && (s.status !== "rejected" || layers().rejected); }
+function hit(x, y) {
+  if (!S.cur) return null;
+  let best = null;
+  const L = layers();
+  if (L.seeds) for (const pod of S.cur.pods) for (const s of pod.seeds) {
+    if (!visibleSeed(s)) continue;
+    if (inPoly(x, y, s.contour) && (!best || s.area_px < best.size)) best = {type: "seed", id: s.id, size: s.area_px};
+  }
+  if (best) return best;
+  if (L.areas) for (const pod of S.cur.pods) for (const u of pod.uncovered)
+    if (!u.dismissed && inPoly(x, y, u.contour)) return {type: "area", pod: pod.index, area: u.area};
+  const pod = podAt(x, y, true);
+  return pod ? {type: "pod", pod: pod.index} : null;
+}
+function podAt(x, y, any = false) { return S.cur.pods.find(p => (any || p.status === "active") && inPoly(x, y, p.outline)); }
+function lineSamples(l, n = 21) {
+  const pts = [];
+  for (let i = 0; i < n; i++) { const t = i / (n - 1); pts.push([l.x0 + t * (l.x1 - l.x0), l.y0 + t * (l.y1 - l.y0)]); }
+  return pts;
+}
+
+// ------------------------------------------------------------------ view
+function resize() {
+  const r = stage.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  cv.width = Math.max(1, r.width * dpr); cv.height = Math.max(1, r.height * dpr);
+  draw();
+}
+function fit() {
+  if (!S.cur) return;
+  const r = stage.getBoundingClientRect();
+  const w = S.cur.width, h = S.cur.height, top = 56;
+  const sc = Math.min(r.width / w, (r.height - top) / h) * 0.97;
+  S.view = {scale: sc, ox: (r.width - w * sc) / 2, oy: top + (r.height - top - h * sc) / 2};
+  draw();
+}
+function focusOn(pts, minScale) {
+  const [x0, y0, x1, y1] = bboxOf(pts), r = stage.getBoundingClientRect();
+  const fitScale = Math.min(r.width / S.cur.width, r.height / S.cur.height);
+  S.view.scale = Math.min(Math.max(S.view.scale, minScale || fitScale * 3), 8);
+  S.view.ox = r.width / 2 - (x0 + x1) / 2 * S.view.scale;
+  S.view.oy = r.height / 2 + 20 - (y0 + y1) / 2 * S.view.scale;
+  draw();
+}
+function layers() {
+  return {seeds: $("lSeeds").checked, guides: $("lGuides").checked, areas: $("lAreas").checked, rejected: $("lRejected").checked};
+}
+
+// ------------------------------------------------------------------ drawing
+let raf = 0;
+function draw() { if (!raf) raf = requestAnimationFrame(paint); }
+function paint() {
+  raf = 0;
+  const dpr = window.devicePixelRatio || 1, v = S.view;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  $("zoom").textContent = S.cur ? `${Math.round(v.scale * 100)} %` : "";
+  if (!S.cur || !S.img) return;
+  ctx.setTransform(dpr * v.scale, 0, 0, dpr * v.scale, dpr * v.ox, dpr * v.oy);
+  ctx.imageSmoothingEnabled = v.scale < 2;
+  ctx.drawImage(S.img, 0, 0);
+  const px = 1 / v.scale, L = layers();
+  const col = {green: css("--g"), orange: css("--o"), red: css("--r"), rejected: css("--muted"), outside: css("--muted")};
+  ctx.lineJoin = "round";
+  for (const pod of S.cur.pods) {
+    const ignored = pod.status !== "active";
+    ctx.setLineDash(ignored ? [8 * px, 6 * px] : []);
+    ctx.lineWidth = (ignored ? 2 : 1.2) * px; ctx.strokeStyle = ignored ? col.rejected : "rgba(30,30,30,.75)";
+    ctx.stroke(S.paths.get("p:" + pod.index));
+    ctx.setLineDash([]);
+    if (ignored) continue;
+    if (L.guides) {
+      ctx.strokeStyle = "#e01e1e"; ctx.lineWidth = 1.2 * px; ctx.stroke(path2d(pod.centerline, false));
+      ctx.strokeStyle = "#1e6ee6"; ctx.lineWidth = 2 * px; ctx.stroke(path2d(pod.bud_cut, false));
+      ctx.lineWidth = 4 * px; ctx.stroke(path2d(pod.stem_cut, false));
+    }
+    if (L.areas) for (const u of pod.uncovered) {
+      if (u.dismissed) continue;
+      ctx.setLineDash([5 * px, 4 * px]); ctx.strokeStyle = css("--m"); ctx.lineWidth = 2 * px;
+      ctx.stroke(S.paths.get(`a:${pod.index}:${u.area}`));
+    }
+    ctx.setLineDash([]);
+    if (L.seeds) for (const s of pod.seeds) {
+      if (!visibleSeed(s)) continue;
+      if (s.cls === "rejected" || s.cls === "outside") {
+        ctx.setLineDash([4 * px, 4 * px]); ctx.lineWidth = 1.5 * px; ctx.strokeStyle = col.rejected;
+      } else { ctx.setLineDash([]); ctx.lineWidth = 2.2 * px; ctx.strokeStyle = col[s.cls]; }
+      ctx.stroke(S.paths.get("s:" + s.id));
+    }
+  }
+  ctx.setLineDash([]);
+  if (S.sel && S.sel.type === "seed") {
+    const [, ss] = findSeed(S.sel.id);
+    const orig = ss && ss.features && ss.features.original;
+    if (orig) { ctx.setLineDash([5 * px, 4 * px]); ctx.lineWidth = 1.5 * px; ctx.strokeStyle = "rgba(255,255,255,.9)"; ctx.stroke(path2d(orig.contour)); ctx.setLineDash([]); }
+  }
+  if (S.path && S.path.length > 1) {
+    ctx.lineWidth = 2.5 * px; ctx.strokeStyle = css("--sel"); ctx.stroke(path2d(S.path, false));
+  }
+  const sp = selPath();
+  if (sp) {
+    ctx.lineWidth = 6 * px; ctx.strokeStyle = "rgba(255,255,255,.95)"; ctx.stroke(sp);
+    ctx.lineWidth = 2.5 * px; ctx.strokeStyle = css("--sel"); ctx.stroke(sp);
+  }
+  if (S.draw) {
+    ctx.lineWidth = 2 * px; ctx.strokeStyle = css("--g"); ctx.setLineDash([6 * px, 4 * px]);
+    ctx.stroke(path2d(ellipsePts(S.draw)));
+  }
+  if (S.line) {
+    ctx.setLineDash([]); ctx.lineWidth = 2.5 * px; ctx.strokeStyle = css("--sel");
+    ctx.beginPath(); ctx.moveTo(S.line.x0, S.line.y0); ctx.lineTo(S.line.x1, S.line.y1); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  // pod counts in screen space
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.font = "700 18px 'Segoe UI', 'Noto Sans', Arial, sans-serif"; ctx.textBaseline = "middle";
+  const rcol = {no: col.green, maybe: col.orange, yes: col.red};
+  for (const pod of S.cur.pods) {
+    if (!pod.summary) continue;
+    const [x0] = bboxOf(pod.outline);
+    const y = (pod.bud_cut[0][1] + pod.bud_cut[1][1]) / 2;
+    const sx = x0 * v.scale + v.ox, sy = y * v.scale + v.oy;
+    const t = String(pod.summary.seed_count), w = ctx.measureText(t).width;
+    const tx = Math.max(4, sx - w - 14);
+    ctx.fillStyle = "rgba(255,255,255,.9)"; ctx.fillRect(tx - 5, sy - 13, w + 10, 26);
+    ctx.fillStyle = rcol[pod.summary.needs_review] || col.red; ctx.fillText(t, tx, sy + 1);
+  }
+}
+function selPath() {
+  if (!S.sel) return null;
+  if (S.sel.type === "seed") return S.paths.get("s:" + S.sel.id);
+  if (S.sel.type === "pod") return S.paths.get("p:" + S.sel.pod);
+  return S.paths.get(`a:${S.sel.pod}:${S.sel.area}`);
+}
+function ellipsePts(d) {
+  const cx = (d.x0 + d.x1) / 2, cy = (d.y0 + d.y1) / 2, rx = Math.abs(d.x1 - d.x0) / 2, ry = Math.abs(d.y1 - d.y0) / 2;
+  const pts = [];
+  for (let i = 0; i < 36; i++) { const a = i / 36 * 2 * Math.PI; pts.push([+(cx + rx * Math.cos(a)).toFixed(1), +(cy + ry * Math.sin(a)).toFixed(1)]); }
+  return pts;
+}
+
+// ------------------------------------------------------------------ side panels
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c])); }
+function chip(s) { return `<span class="chip ${esc(s)}">${esc(s)}</span>`; }
+function sign(n) { return n > 0 ? `+${n}` : String(n); }
+function bar(g, o, r) {
+  const n = Math.max(g + o + r, 1);
+  return `<span class="bar" role="img" aria-label="${g} green, ${o} orange, ${r} red"><i class="g" style="width:${g / n * 100}%"></i><i class="o" style="width:${o / n * 100}%"></i><i class="r" style="width:${r / n * 100}%"></i></span>`;
+}
+function renderEmpty() {
+  const none = !S.images.length;
+  $("emptyState").hidden = !none;
+  for (const id of ["export", "checked", "discard", "next", "undo"]) if (none) $(id).disabled = true;
+  if (none) { $("list").innerHTML = '<li class="mini" style="padding:8px">No images yet.</li>'; $("sel").innerHTML = ""; $("pods").innerHTML = ""; }
+  else $("export").disabled = false;
+  return none;
+}
+function renderList() {
+  if (renderEmpty()) return;
+  $("list").innerHTML = S.images.map(im => {
+    const left = im.reviewed ? 0 : im.orange + im.red;
+    const meta = im.needs_review === "error" ? "could not be processed"
+      : `${im.seeds} seeds, ${im.pods} pods${left ? `, ${left} to check` : ""}${im.edits ? `, ${im.edits} edit${im.edits > 1 ? "s" : ""}` : ""}`;
+    return `<li><button data-id="${im.id}" data-status="${esc(im.needs_review)}" aria-current="${im.id === S.id}">
+      <span class="nm" title="${esc(im.key)}">${esc(im.key)}</span>
+      <span>${im.reviewed ? '<span class="done" title="Checked">&#10003;</span> ' : ""}${chip(im.needs_review)}</span>
+      <span class="meta">${meta}</span></button></li>`;
+  }).join("");
+}
+function renderPanel() {
+  const p = S.cur, s = p.summary;
+  $("imgName").textContent = p.key;
+  $("imgChip").innerHTML = chip(s.needs_review) + (p.reviewed ? ' <span class="done">&#10003; checked</span>' : "");
+  $("imgCount").textContent = `${s.seeds} seeds in ${s.pods} pods`;
+  $("imgBar").innerHTML = bar(s.green, s.orange, s.red) + ` <span style="color:var(--muted)">${s.green} / ${s.orange} / ${s.red}</span>`;
+  $("imgAuto").textContent = s.change ? `Automatic count ${s.auto_seeds}, now ${s.seeds} (${sign(s.change)}).` : `Automatic count ${s.auto_seeds}.`;
+  $("notes").innerHTML = (p.notes || []).map(n => `<p>${esc(n)}</p>`).join("") + (p.error ? `<p>${esc(p.error)}</p>` : "");
+  $("checked").textContent = p.reviewed ? "Mark as not checked" : "Mark image as checked";
+  $("discard").disabled = !p.edits; $("undo").disabled = !p.edits;
+  $("pods").innerHTML = p.pods.map(pod => {
+    const r = pod.summary;
+    if (!r) return `<tr data-pod="${pod.index}"><td>Pod ${pod.index}</td><td colspan="5" class="mini">ignored (not a pod)</td></tr>`;
+    return `<tr data-pod="${pod.index}"><td>Pod ${pod.index}</td><td class="n"><b>${r.seed_count}</b></td>
+      <td class="n mini">${r.auto_count}${r.change ? ` (${sign(r.change)})` : ""}</td>
+      <td>${bar(r.green, r.orange, r.red)}</td><td class="n">${r.pod_confidence.toFixed(2)}</td><td>${chip(r.needs_review)}</td></tr>`
+      + (r.reason ? `<tr class="reason"><td colspan="6">${esc(r.reason)}</td></tr>` : "");
+  }).join("");
+  const todo = checkList().length;
+  $("next").textContent = todo ? `Next to check (${todo} left)` : "Nothing left to check";
+  $("next").disabled = !todo;
+  renderSel();
+}
+function validateSel() {
+  if (!S.sel || !S.cur) return;
+  if (S.sel.type === "seed") { const [, s] = findSeed(S.sel.id); if (!s || s.cls === "split") S.sel = null; }
+  else if (!findPod(S.sel.pod)) S.sel = null;
+}
+function renderSel() {
+  const box = $("sel");
+  if (!S.cur || !S.sel || S.mode !== "select" && !S.mode.startsWith("cut") && S.mode !== "splitpod" && S.mode !== "redraw") {
+    box.innerHTML = `<p class="empty">${HINT[S.mode]}</p>`; return;
+  }
+  if (S.mode !== "select") { box.innerHTML = `<p class="empty">${HINT[S.mode]}</p><div class="row"><button data-act="cancel">Cancel ${K("cancel")}</button></div>`; return; }
+  if (S.sel.type === "seed") {
+    const [pod, s] = findSeed(S.sel.id);
+    if (!s) { S.sel = null; return renderSel(); }
+    const redrawn = s.features && s.features.redrawn ? ", border redrawn" : "";
+    const state = (s.status === "rejected" ? "rejected (not counted)" : s.cls === "outside" ? "outside the cuts (not counted)"
+      : s.features.split_from ? `part of split seed ${esc(s.features.split_from)}`
+      : s.source === "manual" ? "added by you" : s.reviewed === "accepted" ? "accepted by you" : "automatic") + redrawn;
+    const f = s.features || {};
+    box.innerHTML = `<div><span class="dot ${s.cls === "outside" ? "rejected" : s.cls}"></span><b>Seed ${esc(s.id)}</b> in pod ${pod.index}</div>
+      <dl><dt>Status</dt><dd>${state}</dd>
+      <dt>Confidence</dt><dd>${s.source === "manual" ? "-" : s.confidence.toFixed(2)}</dd>
+      <dt>Row</dt><dd>${s.row}</dd><dt>Area</dt><dd>${Math.round(s.area_px)} px${f.area_ratio && !f.redrawn ? ` (${f.area_ratio.toFixed(2)} x typical)` : ""}</dd>
+      ${f.centerline_cross && !f.redrawn ? `<dt>Across line</dt><dd>${Math.round(f.centerline_cross * 100)} %</dd>` : ""}
+      ${f.split ? `<dt>Note</dt><dd>split from a merged object</dd>` : ""}</dl>
+      <div class="row">
+        <button data-act="accept" ${s.status === "active" && (s.reviewed || s.source === "manual") ? "disabled" : ""}>Accept ${K("accept")}</button>
+        <button data-act="reject" ${s.status === "rejected" ? "disabled" : ""}>Reject ${K("reject")}</button>
+        <button data-act="splitmode" ${s.status !== "active" ? "disabled" : ""}>Split ${K("split_mode")}</button>
+        <button data-act="redrawmode" ${s.status !== "active" ? "disabled" : ""}>Redraw ${K("redraw_mode")}</button>
+        ${s.features && s.features.split_from ? `<button data-act="unsplit">Undo split ${K("restore")}</button>`
+          : s.source === "manual" ? `<button data-act="delete">Delete ${K("delete")}</button>`
+          : `<button data-act="restore" ${s.status === "active" && !s.reviewed ? "disabled" : ""}>Undo decision ${K("restore")}</button>`}
+      </div>
+      ${s.features && s.features.redrawn ? `<p class="empty" style="margin:8px 0 0">The automatic border is shown dashed. ${s.source === "manual" ? "" : "Undo decision restores it."}</p>` : ""}`;
+  } else if (S.sel.type === "area") {
+    const pod = findPod(S.sel.pod), u = pod && pod.uncovered.find(a => a.area === S.sel.area);
+    if (!u) { S.sel = null; return renderSel(); }
+    box.innerHTML = `<div><span class="dot area"></span><b>Dark area without a seed</b> in pod ${pod.index}</div>
+      <dl><dt>Size</dt><dd>${Math.round(u.area_px)} px</dd><dt>Status</dt><dd>${u.dismissed ? "marked as not a seed" : "open"}</dd></dl>
+      <div class="row"><button data-act="addarea">Add as seed ${K("accept")}</button>
+      ${u.dismissed ? `<button data-act="undismiss">Undo ${K("restore")}</button>` : `<button data-act="dismiss">Not a seed ${K("reject")}</button>`}</div>
+      <p class="empty" style="margin:8px 0 0">To draw the seed yourself instead, use Add seed.</p>`;
+  } else {
+    const pod = findPod(S.sel.pod);
+    if (!pod) { S.sel = null; return renderSel(); }
+    if (pod.status !== "active") {
+      box.innerHTML = `<div><b>Pod ${pod.index}</b>: ignored (not a pod, not counted)</div>
+        <div class="row"><button data-act="restorepod">Count this pod again</button></div>`;
+      return;
+    }
+    const r = pod.summary, others = S.cur.pods.filter(p => p.index !== pod.index && p.status === "active");
+    box.innerHTML = `<div><b>Pod ${pod.index}</b> ${chip(r.needs_review)}</div>
+      <dl><dt>Seeds</dt><dd>${r.seed_count} (top ${r.top_row}, bottom ${r.bottom_row})</dd>
+      <dt>Automatic</dt><dd>${r.auto_count}${r.change ? ` (${sign(r.change)} by review)` : ""}</dd>
+      <dt>Confidence</dt><dd>${r.pod_confidence.toFixed(2)}</dd></dl>
+      <div class="row"><button data-act="cutbud">Move bud cut</button><button data-act="cutstem">Move stem cut</button></div>
+      <div class="row"><button data-act="splitpod" title="Two touching pods were detected as one">Split pod</button>
+        <button data-act="ignorepod" title="Not a pod, e.g. debris: do not count it">Not a pod</button></div>
+      ${others.length ? `<div class="row"><label for="mergeWith">Merge with</label><select id="mergeWith">${others.map(o => `<option value="${o.index}">pod ${o.index}</option>`).join("")}</select>
+        <button data-act="merge" title="One pod was detected as two pieces">Merge</button></div>` : ""}`;
+  }
+}
+
+// ------------------------------------------------------------------ actions
+function act(name) {
+  if (name === "cancel") return setMode("select");
+  if (!S.cur || !S.sel) return;
+  if (S.sel.type === "seed") {
+    const [, s] = findSeed(S.sel.id); if (!s) return;
+    if (name === "accept" && !(s.status === "active" && (s.reviewed || s.source === "manual"))) edit({op: "accept", seed: s.id}, true);
+    if (name === "reject" && s.status !== "rejected") edit({op: "reject", seed: s.id}, true);
+    if (name === "restore" && s.source !== "manual") edit({op: "restore", seed: s.id});
+    if ((name === "unsplit" || name === "restore") && s.features && s.features.split_from) {
+      const orig = s.features.split_from; S.sel = {type: "seed", id: orig};
+      edit({op: "restore", seed: orig}).then(ok => ok && toast(`Split of seed ${orig} undone`));
+    }
+    if (name === "delete" && s.source === "manual" && !(s.features && s.features.split_from)) { S.sel = null; edit({op: "delete", seed: s.id}); }
+    if (name === "splitmode" && s.status === "active") setMode("split");
+    if (name === "redrawmode" && s.status === "active") setMode("redraw");
+  } else if (S.sel.type === "area") {
+    const pod = findPod(S.sel.pod), u = pod.uncovered.find(a => a.area === S.sel.area);
+    if (name === "addarea" || name === "accept") edit({op: "add", pod: pod.index, contour: u.contour}, true);
+    if ((name === "dismiss" || name === "reject") && !u.dismissed) edit({op: "dismiss", pod: pod.index, area: u.area}, true);
+    if ((name === "undismiss" || name === "restore") && u.dismissed) edit({op: "undismiss", pod: pod.index, area: u.area});
+  } else {
+    const k = S.sel.pod;
+    if (name === "cutbud" || name === "cutstem" || name === "splitpod") setMode(name);
+    if (name === "ignorepod") edit({op: "ignore_pod", pod: k});
+    if (name === "restorepod") edit({op: "restore_pod", pod: k});
+    if (name === "merge") { const o = +$("mergeWith").value; edit({op: "merge_pods", pods: [k, o]}).then(ok => ok && toast(`Pod ${o} merged into pod ${k}`)); }
+  }
+}
+function checkList() {
+  if (!S.cur || S.cur.reviewed) return [];
+  const items = [];
+  for (const pod of S.cur.pods) {
+    if (pod.status !== "active") continue;
+    for (const s of pod.seeds)
+      if (s.status === "active" && s.source === "auto" && !s.reviewed && (s.cls === "orange" || s.cls === "red"))
+        items.push({type: "seed", id: s.id, pod: pod.index, x: s.centroid[0], pts: s.contour});
+    for (const u of pod.uncovered) {
+      const c = centroidOf(u.contour);
+      if (!u.dismissed && !pod.seeds.some(s => s.status === "active" && inPoly(c[0], c[1], s.contour)))
+        items.push({type: "area", pod: pod.index, area: u.area, x: c[0], pts: u.contour});
+    }
+  }
+  const order = new Map(S.cur.pods.map((p, i) => [p.index, i]));
+  return items.sort((a, b) => order.get(a.pod) - order.get(b.pod) || a.x - b.x);
+}
+function nextToCheck(dir = 1, afterDecision = false) {
+  const items = checkList();
+  if (!items.length) { S.sel = null; renderSel(); draw(); return toast(afterDecision ? `Everything in this image is checked.${keyText("toggle_checked") ? ` Press ${keyText("toggle_checked")} to mark it.` : ""}` : "Nothing left to check in this image"); }
+  const order = new Map(S.cur.pods.map((p, i) => [p.index, i]));
+  let i = -1;
+  if (S.sel && S.sel.type !== "pod") {
+    let podK, x;
+    if (S.sel.type === "seed") { const [p, s] = findSeed(S.sel.id); if (s) { podK = p.index; x = s.centroid[0]; } }
+    else { const p = findPod(S.sel.pod), u = p && p.uncovered.find(a => a.area === S.sel.area); if (u) { podK = p.index; x = centroidOf(u.contour)[0]; } }
+    if (podK !== undefined) {
+      const po = order.get(podK);
+      if (dir > 0) i = items.findIndex(it => order.get(it.pod) > po || (it.pod === podK && it.x > x + 0.01));
+      else for (let k = items.length - 1; k >= 0; k--) if (order.get(items[k].pod) < po || (items[k].pod === podK && items[k].x < x - 0.01)) { i = k; break; }
+    }
+  }
+  if (i === -1) i = dir > 0 ? 0 : items.length - 1;
+  const it = items[i];
+  S.sel = it.type === "seed" ? {type: "seed", id: it.id} : {type: "area", pod: it.pod, area: it.area};
+  renderSel(); focusOn(it.pts);
+}
+function setMode(m) {
+  if ((m === "cutbud" || m === "cutstem" || m === "splitpod") && !(S.sel && S.sel.type === "pod")) return toast("Select a pod first: click an empty part of it");
+  if (m === "redraw") {
+    const s = S.sel && S.sel.type === "seed" ? findSeed(S.sel.id)[1] : null;
+    if (!s || s.status !== "active") return toast(`Select a counted seed first${keyText("redraw_mode") ? `, then press ${keyText("redraw_mode")}` : ""}`);
+  }
+  S.path = null;
+  S.mode = m; S.draw = null; S.line = null;
+  for (const [k, id] of Object.entries(MODES)) $(id).classList.toggle("on", k === m);
+  stage.classList.toggle("add", m !== "select");
+  renderSel(); draw();
+}
+
+// ------------------------------------------------------------------ mouse
+cv.addEventListener("wheel", e => {
+  e.preventDefault();
+  const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+  const f = Math.exp(-e.deltaY * (e.deltaMode ? 0.05 : 0.0015));
+  const v = S.view, ns = Math.min(Math.max(v.scale * f, 0.02), 12);
+  v.ox = mx - (mx - v.ox) * ns / v.scale; v.oy = my - (my - v.oy) * ns / v.scale; v.scale = ns;
+  draw();
+}, {passive: false});
+cv.addEventListener("contextmenu", e => e.preventDefault());
+cv.addEventListener("pointerdown", e => {
+  if (!S.cur) return;
+  cv.setPointerCapture(e.pointerId);
+  const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+  const pan = e.button !== 0 || S.mode === "select" || e.shiftKey;
+  S.drag = {mx, my, ox: S.view.ox, oy: S.view.oy, moved: false, pan};
+  if (!pan) {
+    const [x, y] = toImage(mx, my);
+    if (S.mode === "add") S.draw = {x0: x, y0: y, x1: x, y1: y};
+    if (S.mode === "split" || S.mode === "splitpod") S.line = {x0: x, y0: y, x1: x, y1: y};
+    if (S.mode === "redraw") S.path = [[x, y]];
+  }
+});
+cv.addEventListener("pointermove", e => {
+  if (!S.drag) return;
+  const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top, d = S.drag;
+  if (Math.hypot(mx - d.mx, my - d.my) > 4) d.moved = true;
+  const [x, y] = toImage(mx, my);
+  if (d.pan) { S.view.ox = d.ox + mx - d.mx; S.view.oy = d.oy + my - d.my; }
+  else if (S.draw) { S.draw.x1 = x; S.draw.y1 = y; }
+  else if (S.line) { S.line.x1 = x; S.line.y1 = y; }
+  else if (S.path) {
+    const [lx, ly] = S.path[S.path.length - 1];
+    if (Math.hypot(x - lx, y - ly) * S.view.scale >= 2) S.path.push([x, y]);
+  }
+  draw();
+});
+cv.addEventListener("pointerup", async e => {
+  const d = S.drag; S.drag = null;
+  if (!d || !S.cur) return;
+  const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+  const [x, y] = toImage(mx, my);
+  if (!d.pan && S.mode === "add" && S.draw) {
+    const dr = S.draw; S.draw = null;
+    const w = Math.abs(dr.x1 - dr.x0), h = Math.abs(dr.y1 - dr.y0);
+    if (w * S.view.scale < 6 || h * S.view.scale < 6) { draw(); return toast("Drag to draw an ellipse around the seed"); }
+    const pod = podAt((dr.x0 + dr.x1) / 2, (dr.y0 + dr.y1) / 2);
+    if (!pod) { draw(); return toast("Draw the seed inside a pod", true); }
+    return edit({op: "add", pod: pod.index, contour: ellipsePts(dr)});
+  }
+  if (!d.pan && S.line && (S.mode === "split" || S.mode === "splitpod")) {
+    const l = S.line; S.line = null;
+    if (Math.hypot(l.x1 - l.x0, l.y1 - l.y0) * S.view.scale < 8) { draw(); return toast("Drag a line"); }
+    const line = [[+l.x0.toFixed(1), +l.y0.toFixed(1)], [+l.x1.toFixed(1), +l.y1.toFixed(1)]];
+    const pts = lineSamples(l);
+    if (S.mode === "split") {
+      let best = null, bestN = 0;
+      for (const s of allSeeds()) {
+        if (s.status !== "active" || s.cls === "split") continue;
+        const n = pts.filter(p => inPoly(p[0], p[1], s.contour)).length;
+        if (n > bestN || (n === bestN && n && S.sel && S.sel.id === s.id)) { best = s; bestN = n; }
+      }
+      if (!best) { draw(); return toast("Draw the line through a seed", true); }
+      const ok = await edit({op: "split", seed: best.id, line});
+      if (ok) toast(`Seed ${best.id} split into two`);
+      return;
+    }
+    const k = S.sel.pod;
+    if (await edit({op: "split_pod", pod: k, line})) { toast(`Pod ${k} split in two`); S.sel = {type: "pod", pod: k}; setMode("select"); }
+    return;
+  }
+  if (!d.pan && S.mode === "redraw" && S.path) {
+    const path = S.path; S.path = null;
+    const [x0, y0, x1, y1] = bboxOf(path);
+    if (path.length < 8 || (x1 - x0) * S.view.scale < 6 || (y1 - y0) * S.view.scale < 6) { draw(); return toast("Trace all the way around the seed in one stroke"); }
+    const id = S.sel.id;
+    const contour = path.map(([px_, py_]) => [+px_.toFixed(1), +py_.toFixed(1)]);
+    if (await edit({op: "redraw", seed: id, contour})) { S.sel = {type: "seed", id}; setMode("select"); toast(`Border of seed ${id} redrawn`); }
+    return;
+  }
+  if (!d.pan && (S.mode === "cutbud" || S.mode === "cutstem")) {
+    const k = S.sel.pod, which = S.mode === "cutbud" ? "bud" : "stem";
+    if (await edit({op: "cut", pod: k, which, x: +x.toFixed(1)})) { toast(`${which === "bud" ? "Bud" : "Stem"} cut of pod ${k} moved`); setMode("select"); }
+    return;
+  }
+  if (d.pan && !d.moved && e.button === 0) { S.sel = hit(x, y); renderSel(); draw(); }
+});
+
+// ------------------------------------------------------------------ overview
+function statusRank(im) { return im.reviewed ? -1 : {no: 0, maybe: 1, yes: 2, error: 3}[im.needs_review] ?? 0; }
+function renderOverview() {
+  const t = S.totals || {images: 0, checked: 0};
+  $("ovHead").textContent = `${t.checked} of ${t.images} images checked; ${t.need_review} still need review`;
+  $("ovProg").style.width = `${t.images ? t.checked / t.images * 100 : 0}%`;
+  $("ovAcc").textContent = t.checked
+    ? `On the ${t.checked_pods} pods of checked images, review changed the automatic counts by ${t.checked_abs_change} seeds in total (${(t.checked_rel_change * 100).toFixed(1)} % of ${t.checked_seeds}).`
+    : "Accuracy of the automatic counts appears here once images are checked.";
+  const f = $("ovFilter").value;
+  const keep = {all: () => true, unchecked: im => !im.reviewed, review: im => im.needs_review !== "no" && !im.reviewed,
+                red: im => im.red > 0 && !im.reviewed, edited: im => im.edits > 0}[f];
+  const k = S.ovSort.k, dir = S.ovSort.dir;
+  const val = im => k === "status" ? statusRank(im) : k === "todo" ? im.orange + im.red : k === "reviewed" ? +im.reviewed : im[k];
+  const rows = S.images.filter(keep).sort((a, b) => (val(a) > val(b) ? 1 : val(a) < val(b) ? -1 : 0) * dir || a.id - b.id);
+  document.querySelectorAll("#overview th").forEach(th => { if (th.dataset.k === k) th.setAttribute("aria-sort", dir > 0 ? "ascending" : "descending"); else th.removeAttribute("aria-sort"); });
+  $("ovBody").innerHTML = rows.map(im => `<tr data-id="${im.id}"><td>${esc(im.key)}</td><td>${chip(im.needs_review)}</td>
+    <td>${im.reviewed ? '<span class="done">&#10003;</span>' : ""}</td><td class="n"><b>${im.seeds}</b></td><td class="n">${im.auto_seeds}</td>
+    <td class="n">${im.change ? sign(im.change) : ""}</td><td class="n">${im.orange} / ${im.red}</td><td class="n">${im.pods_flagged}</td>
+    <td class="n">${im.redrawn || ""}</td><td class="n">${im.edits || ""}</td></tr>`).join("") || `<tr><td colspan="10" class="mini">No images match this filter.</td></tr>`;
+}
+function toggleOverview(show) {
+  const ov = $("overview"); show = show ?? ov.hidden;
+  ov.hidden = !show; $("ovBtn").classList.toggle("on", show);
+  if (show) { loadList(); renderOverview(); }
+}
+$("ovBtn").onclick = () => toggleOverview();
+$("ovClose").onclick = () => toggleOverview(false);
+$("ovFilter").onchange = renderOverview;
+document.querySelector("#overview thead").addEventListener("click", e => {
+  const th = e.target.closest("th"); if (!th) return;
+  S.ovSort = {k: th.dataset.k, dir: S.ovSort.k === th.dataset.k ? -S.ovSort.dir : (th.dataset.k === "key" ? 1 : -1)};
+  renderOverview();
+});
+$("ovBody").addEventListener("click", e => { const tr = e.target.closest("tr[data-id]"); if (tr) { toggleOverview(false); openImage(+tr.dataset.id); } });
+
+// ------------------------------------------------------------------ learn from reviews
+let jobTimer = 0;
+function fmtB(t) { return t && t.border_overlap != null ? t.border_overlap.toFixed(3) : "-"; }
+function fmtT(t) { return t ? `${t.abs_error} seeds (${((t.rel_error || 0) * 100).toFixed(1)} %), seed F1 ${(t.f1 || 0).toFixed(3)}` : "-"; }
+function renderJob(j) {
+  const box = $("lnBody");
+  $("lnStart").disabled = j.state === "running";
+  $("lnApply").hidden = !(j.kind === "calibrate" && j.state === "done");
+  if (j.state === "running") {
+    box.innerHTML = `<p><b>${j.kind === "apply" ? "Applying" : "Learning"}</b>: ${esc(j.message)}${j.total ? ` (${j.done} of ${j.total})` : ""}</p>
+      ${j.total ? `<span class="progress"><i style="width:${j.done / j.total * 100}%"></i></span>` : ""}`;
+  } else if (j.state === "error") {
+    box.innerHTML = `<p style="color:var(--r)">${esc(j.message)}</p>`;
+  } else if (j.state === "done" && j.kind === "calibrate") {
+    const r = j.result, n = Object.keys(r.changes).length;
+    box.innerHTML = `<p>Used ${r.images} images (${r.reviewed_images} checked in the review).</p>
+      <table><tr><th></th><th>Count error over all pods</th><th>Border overlap</th></tr>
+      <tr><td>Current settings</td><td>${fmtT(r.before)}</td><td>${fmtB(r.before)}</td></tr>
+      <tr><td>New settings</td><td>${fmtT(r.after)}</td><td>${fmtB(r.after)}</td></tr></table>
+      <p class="mini">${r.redrawn_seeds ? `Border overlap compares detected borders with the ${r.redrawn_seeds} border${r.redrawn_seeds > 1 ? "s" : ""} you redrew (1 = identical).`
+        : "No redrawn borders yet, so border shape was not used. Redraw wrong borders (D) on checked images to teach it."}</p>
+      <p class="mini">${n} settings would change. Scores are measured on the same images, so they are optimistic.
+      Images you have edited keep the analysis you reviewed; the others are analysed again.</p>
+      ${(r.warnings || []).map(w => `<p class="mini">${esc(w)}</p>`).join("")}`;
+  } else if (j.state === "done" && j.kind === "apply") {
+    box.innerHTML = `<p>New settings saved (backup: ${esc(j.result.backup)}). ${j.result.reanalysed} images analysed again.</p>`;
+  } else box.innerHTML = `<p class="mini">${S.totals ? `${S.totals.checked} images are marked as checked.` : ""}</p>`;
+}
+async function pollJob() {
+  clearTimeout(jobTimer);
+  try {
+    const j = await api("/api/job");
+    renderJob(j);
+    if (j.state === "running") jobTimer = setTimeout(pollJob, 800);
+    else if (j.kind === "apply" && j.state === "done" && !pollJob.reloaded) { pollJob.reloaded = true; await loadList(); openImage(S.id, true); }
+  } catch (err) { toast(err.message, true); }
+}
+$("learnBtn").onclick = () => { $("learn").showModal(); pollJob(); };
+$("lnClose").onclick = () => $("learn").close();
+$("lnStart").onclick = async () => {
+  try { renderJob(await post("/api/calibrate", {use_gt: $("lnGt").checked, sweep: $("lnSweep").checked})); pollJob(); }
+  catch (err) { toast(err.message, true); }
+};
+$("lnApply").onclick = async () => {
+  if (!confirm("Save the new settings (a backup of the old file is kept) and analyse the unedited images again?")) return;
+  pollJob.reloaded = false;
+  try { renderJob(await post("/api/calibrate/apply")); pollJob(); } catch (err) { toast(err.message, true); }
+};
+
+// ------------------------------------------------------------------ add images
+async function upload(url, file) {
+  const r = await fetch(url, {method: "POST", body: file, headers: {"Content-Type": "application/octet-stream"}});
+  const d = await r.json().catch(() => ({error: `HTTP ${r.status}`}));
+  if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+  return d;
+}
+async function addImages(files) {
+  files = [...files].filter(f => /\.tiff?$/i.test(f.name));
+  const box = $("imgStatus");
+  if (!files.length) { box.innerHTML = `<p class="bad">Only .tif / .tiff files can be added.</p>`; return; }
+  const lines = [];
+  const show = extra => box.innerHTML = lines.map(l => `<p>${l}</p>`).join("") + (extra || "");
+  let added = 0;
+  for (const f of files) {
+    lines.push(`${esc(f.name)}: uploading`); show();
+    try {
+      const r = await upload(`/api/upload/image?name=${encodeURIComponent(f.name)}`, f);
+      lines[lines.length - 1] = `${esc(f.name)}: ${r.status === "added" ? '<span class="ok">added</span>' : "already in the input folder"}`;
+      if (r.status === "added") added++;
+    } catch (err) { lines[lines.length - 1] = `<span class="bad">${esc(err.message)}</span>`; }
+    show();
+  }
+  if (!added) return;
+  try {
+    await post("/api/images/analyse");
+    const poll = async () => {
+      const j = await api("/api/job");
+      if (j.state === "running") { show(`<p>Analysing: ${j.done} of ${j.total}</p><span class="progress"><i style="width:${j.total ? j.done / j.total * 100 : 0}%"></i></span>`); setTimeout(poll, 700); }
+      else if (j.state === "error") show(`<p class="bad">${esc(j.message)}</p>`);
+      else { show(`<p class="ok">${j.result ? j.result.added : added} image(s) ready in the list.</p>`); await loadList(); if (S.id === null) openImage(0); }
+    };
+    poll();
+  } catch (err) { show(`<p class="bad">${esc(err.message)}</p>`); }
+}
+$("emptyAdd").onclick = () => $("addImgBtn").click();
+$("addImgBtn").onclick = () => { $("imgStatus").innerHTML = ""; $("addImg").showModal(); };
+$("imgClose").onclick = () => $("addImg").close();
+$("imgFiles").onchange = e => { addImages(e.target.files); e.target.value = ""; };
+const drop = $("imgDrop");
+drop.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("imgFiles").click(); } });
+["dragenter", "dragover"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => addImages(e.dataTransfer.files));
+
+// ------------------------------------------------------------------ add annotation
+const ANN = {token: null, res: null};
+function annReady() { $("annCheck").disabled = !($("annRaw").files.length && $("annImg").files.length); }
+$("annRaw").onchange = annReady; $("annImg").onchange = annReady;
+async function annList() {
+  try {
+    const d = await api("/api/annotations");
+    $("annList").innerHTML = (d.entries.length ? `<table><tbody>${d.entries.map(e => `<tr><td>${esc(e.image)}</td>
+      <td>${e.pod_counts ? `${e.pod_counts.length} pods, ${e.pod_counts.reduce((a, b) => a + b, 0)} seeds` : "outline counts only"}</td>
+      <td><button data-rm="${esc(e.image)}">Remove</button></td></tr>`).join("")}</tbody></table>` : "<p>None yet.</p>")
+      + d.warnings.map(w => `<p>${esc(w)}</p>`).join("");
+  } catch (err) { $("annList").textContent = err.message; }
+}
+$("annList").addEventListener("click", async e => {
+  const b = e.target.closest("button[data-rm]"); if (!b) return;
+  if (!confirm(`Remove the annotation of ${b.dataset.rm}? Its files are moved to ground_truth/removed/.`)) return;
+  try { await post("/api/annotations/remove", {image: b.dataset.rm}); toast("Annotation removed"); annList(); } catch (err) { toast(err.message, true); }
+});
+function annCompare() {
+  const rows = [...document.querySelectorAll("#annPods tr[data-i]")];
+  let filled = 0, bad = 0;
+  for (const tr of rows) {
+    const p = ANN.res.pods[+tr.dataset.i], v = tr.querySelector("input").value.trim(), cell = tr.querySelector(".st");
+    if (v === "") { cell.innerHTML = ""; continue; }
+    filled++;
+    const n = +v, d = p.shapes - n;
+    if (!Number.isInteger(n) || n < 0) { cell.innerHTML = '<span class="bad">whole number</span>'; bad++; }
+    else if (d === 0) cell.innerHTML = '<span class="ok">&#10003; match</span>';
+    else { bad++; cell.innerHTML = `<span class="bad" title="${d > 0 ? "more outlined shapes than your count" : "fewer outlined shapes than your count"}">${d > 0 ? `${d} more` : `${-d} fewer`}</span>`; }
+  }
+  const all = filled === rows.length;
+  $("annSave").hidden = false; $("annSave").disabled = !all;
+  $("annSummary").innerHTML = !all ? `Type a count for every pod (${filled} of ${rows.length}).`
+    : bad ? `<span class="bad">${bad} pod${bad > 1 ? "s" : ""} differ.</span> Usually an outline is not closed (fewer shapes), or a gap between touching outlines was taken as a shape (more). Fix the annotation, or save anyway: your counts are then the truth, and the outlines are used for seed matching.`
+    : `<span class="ok">All pods match.</span>`;
+  return {all, bad};
+}
+$("annCheck").onclick = async () => {
+  const box = $("annResult"); $("annSave").hidden = true;
+  box.innerHTML = "<p>Uploading</p>";
+  try {
+    if (ANN.token) await post("/api/annotations/cancel", {token: ANN.token});
+    const raw = $("annRaw").files[0], ann = $("annImg").files[0];
+    const a = await upload(`/api/upload/annotation?role=raw&name=${encodeURIComponent(raw.name)}`, raw);
+    await upload(`/api/upload/annotation?role=annotation&token=${a.token}&name=${encodeURIComponent(ann.name)}`, ann);
+    box.innerHTML = "<p>Finding pods and outlined shapes</p>";
+    const r = await post("/api/annotations/check", {token: a.token});
+    ANN.token = a.token; ANN.res = r;
+    box.innerHTML = `<div class="annview"><a href="/api/annotations/preview/${r.token}" target="_blank" title="Open larger in a new tab"><img alt="Recognised outlines (magenta) on ${esc(r.raw)}" src="/api/annotations/preview/${r.token}?t=${Date.now()}"></a>
+      <div><p>Recognised shapes are drawn in magenta. ${r.shapes_total} shapes in total${r.shapes_outside ? `, <span class="bad">${r.shapes_outside} outside any pod</span>` : ""}.</p>
+      ${r.already_annotated ? `<p class="bad">${esc(r.raw)} is already annotated; remove the old annotation below before saving this one.</p>` : ""}
+      ${r.warnings.map(w => `<p class="mini">${esc(w)}</p>`).join("")}
+      <table><thead><tr><th>Pod</th><th>Shapes</th><th>Your count</th><th>Shapes vs. count</th></tr></thead><tbody id="annPods">
+      ${r.pods.map((p, i) => `<tr data-i="${i}"><td>Pod ${p.pod}</td><td class="n">${p.shapes}</td>
+        <td><input type="number" min="0" step="1" inputmode="numeric" aria-label="Seeds in pod ${p.pod}"></td><td class="st"></td></tr>`).join("")}
+      </tbody></table><p id="annSummary" class="mini"></p></div></div>`;
+    box.querySelectorAll("input").forEach(inp => inp.addEventListener("input", annCompare));
+    annCompare();
+    const first = box.querySelector("input"); if (first) first.focus();
+  } catch (err) { box.innerHTML = `<p class="bad">${esc(err.message)}</p>`; }
+};
+$("annSave").onclick = async () => {
+  const st = annCompare();
+  if (!st.all) return;
+  if (st.bad && !confirm(`${st.bad} pod(s) do not match the outlined shapes. Save anyway, with your counts as the truth?`)) return;
+  const counts = [...document.querySelectorAll("#annPods input")].map(i => +i.value);
+  try {
+    const r = await post("/api/annotations/save", {token: ANN.token, pod_counts: counts});
+    ANN.token = null; ANN.res = null;
+    $("annResult").innerHTML = `<p class="ok">Saved ${esc(r.image)} with ${r.pod_counts.length} pod counts.</p>`;
+    $("annSave").hidden = true; $("annRaw").value = ""; $("annImg").value = ""; annReady(); annList();
+  } catch (err) { toast(err.message, true); }
+};
+$("addAnnBtn").onclick = () => { $("addAnn").showModal(); annList(); };
+$("annClose").onclick = async () => {
+  if (ANN.token) { try { await post("/api/annotations/cancel", {token: ANN.token}); } catch (e) { /* ignore */ } ANN.token = null; }
+  $("addAnn").close();
+};
+
+// ------------------------------------------------------------------ keyboard and buttons
+const KEY_ACTIONS = {
+  accept: () => act("accept"), reject: () => act("reject"), restore: () => act("restore"), delete: () => act("delete"),
+  next: () => nextToCheck(1), previous: () => nextToCheck(-1),
+  previous_image: () => openImage(S.id - 1), next_image: () => openImage(S.id + 1), overview: () => toggleOverview(),
+  select_mode: () => setMode("select"), add_mode: () => setMode(S.mode === "add" ? "select" : "add"),
+  split_mode: () => setMode(S.mode === "split" ? "select" : "split"),
+  redraw_mode: () => setMode(S.mode === "redraw" ? "select" : "redraw"),
+  cancel: () => { if (S.mode !== "select") setMode("select"); else { S.sel = null; renderSel(); draw(); } },
+  fit: () => fit(), toggle_checked: () => toggleChecked(), undo: () => undo(),
+};
+document.addEventListener("keydown", e => {
+  if (e.target.matches("input[type=text], input[type=number], textarea, select") || document.querySelector("dialog[open]")) return;
+  if (["Shift", "Control", "Alt", "Meta", "AltGraph"].includes(e.key)) return;
+  const action = KEYMAP.get(comboOf(e));
+  const fn = action && KEY_ACTIONS[action];
+  if (fn) { e.preventDefault(); fn(); }
+});
+$("list").addEventListener("click", e => { const b = e.target.closest("button[data-id]"); if (b) { toggleOverview(false); openImage(+b.dataset.id); } });
+$("sel").addEventListener("click", e => { const b = e.target.closest("button[data-act]"); if (b) act(b.dataset.act); });
+$("pods").addEventListener("click", e => {
+  const tr = e.target.closest("tr[data-pod]"); if (!tr) return;
+  const pod = findPod(+tr.dataset.pod); if (!pod) return;
+  S.sel = {type: "pod", pod: pod.index}; renderSel();
+  const r = stage.getBoundingClientRect(), [x0, , x1] = bboxOf(pod.outline);
+  focusOn(pod.outline, Math.min(r.width / (x1 - x0) * 0.95, 8));
+});
+$("mSelect").onclick = () => setMode("select");
+$("mAdd").onclick = () => setMode("add");
+$("mSplit").onclick = () => setMode("split");
+$("mRedraw").onclick = () => setMode("redraw");
+$("fit").onclick = fit;
+$("undo").onclick = undo;
+$("next").onclick = () => nextToCheck(1);
+["lSeeds", "lGuides", "lAreas", "lRejected"].forEach(id => $(id).onchange = draw);
+function toggleChecked() { if (S.cur) edit({op: "reviewed", value: !S.cur.reviewed}).then(ok => ok && toast(S.cur.reviewed ? "Image marked as checked" : "Image marked as not checked")); }
+$("checked").onclick = toggleChecked;
+$("discard").onclick = async () => {
+  if (!S.cur || !confirm("Remove all your changes to this image? It will be analysed again with the current settings.")) return;
+  try { setPayload(await post(`/api/image/${S.id}/discard`)); S.sel = null; renderSel(); draw(); loadList(); toast("Changes removed"); }
+  catch (err) { toast(err.message, true); }
+};
+$("export").onclick = async () => {
+  const b = $("export"); b.disabled = true; b.textContent = "Saving";
+  try { const r = await post("/api/export"); toast(`Saved ${r.images} images (${r.reviewed} checked) to ${S.outputDir}`); }
+  catch (err) { toast(err.message, true); }
+  finally { b.disabled = false; b.textContent = "Save results"; }
+};
+let thrTimer = 0;
+function onThreshold(which) {
+  const rv = $("thrReview"), rj = $("thrReject");
+  if (+rj.value > +rv.value) { if (which === "review") rj.value = rv.value; else rv.value = rj.value; }
+  S.thr = {review: +rv.value, reject: +rj.value};
+  $("thrReviewV").textContent = S.thr.review.toFixed(2); $("thrRejectV").textContent = S.thr.reject.toFixed(2);
+  clearTimeout(thrTimer);
+  thrTimer = setTimeout(async () => { await loadList(); if (S.id !== null) openImage(S.id, true); }, 150);
+}
+$("thrReview").oninput = () => onThreshold("review");
+$("thrReject").oninput = () => onThreshold("reject");
+window.addEventListener("resize", resize);
+
+(async function start() {
+  resize();
+  await loadKeys();
+  try {
+    const d = await api("/api/images");
+    S.thr = d.thresholds; S.totals = d.totals;
+    $("thrReview").value = S.thr.review; $("thrReject").value = S.thr.reject;
+    $("thrReviewV").textContent = (+S.thr.review).toFixed(2); $("thrRejectV").textContent = (+S.thr.reject).toFixed(2);
+    S.images = d.images; S.outputDir = d.output_dir; renderList();
+    if (!renderEmpty()) {
+      const first = S.images.findIndex(im => im.needs_review !== "no" && !im.reviewed);
+      await openImage(first >= 0 ? first : 0);
+    }
+  } catch (err) { toast("Cannot reach the review server: " + err.message, true); }
+})();
+</script>
+</body>
+</html>

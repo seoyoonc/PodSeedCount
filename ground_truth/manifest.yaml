@@ -1,0 +1,12 @@
+# Ground-truth annotations: one entry per annotated image. See MANUAL.md, sections 13 and 21.
+#
+# The easiest way to add an entry is "Add annotation" in the review page: it copies the files and
+# fills in an entry for you. To add one by hand, fill in the empty fields below (copy the block,
+# starting with "- image:", for each further image):
+#   image:       file name of the raw TIFF in ground_truth/raw/        e.g. my_image.tif
+#   annotation:  file name of the annotated copy in ground_truth/annotations/   e.g. my_image_annotated.png
+#   pod_counts:  hand counts per pod, top to bottom (optional)        e.g. [31, 28, 30, 25]
+# A block with all fields empty is ignored.
+- image:
+  annotation:
+  pod_counts:

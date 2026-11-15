@@ -1,0 +1,40 @@
+# Keyboard shortcuts of the review page (http://localhost:8000).
+#
+# Change a key by editing the list after an action, save, and reload the page in the browser
+# (no restart needed). Each action can have several keys, e.g.  delete: [Delete, Backspace]
+# An empty list, e.g.  overview: [] , switches the shortcut off.
+#
+# How to write keys:
+#   letters and digits      A, D, 7          (case does not matter: a = A)
+#   with modifiers          Shift+N, Ctrl+Z, Alt+A, Ctrl+Shift+Z   (Ctrl also matches Cmd on a Mac)
+#   other characters        "[", "]", "?", "/"   (put them in quotes; Shift is part of the character
+#                                                  itself, so write "?" rather than Shift+/)
+#   named keys              Delete, Backspace, Escape, Enter, Space, Tab, Home, End,
+#                           ArrowLeft, ArrowRight, ArrowUp, ArrowDown, PageUp, PageDown, F1 ... F12
+# Each key can belong to only one action. Avoid keys the browser itself uses (Ctrl+W, Ctrl+R, F5).
+# Actions not listed here keep their default key.
+
+# Deciding about the selected seed or dark area
+accept: [A]                  # accept the seed / add the dark area as a seed
+reject: [R]                  # reject the seed / mark the dark area as not a seed
+restore: [U]                 # undo the decision on the selected item (also restores a redrawn border)
+delete: [Delete, Backspace]  # delete a seed you added yourself
+
+# Moving through the work
+next: [N]                    # next orange or red seed or dark area
+previous: [Shift+N]          # previous one
+previous_image: ["["]
+next_image: ["]"]
+overview: [O]                # show / hide the overview of all images
+
+# Drawing modes
+select_mode: [S]
+add_mode: [E]                # add seed: drag an ellipse
+split_mode: [X]              # split seed: drag a line through it
+redraw_mode: [D]             # redraw border: trace the outline of the selected seed
+cancel: [Escape]             # leave a drawing mode / clear the selection
+
+# View and image
+fit: [F]                     # show the whole image
+toggle_checked: [C]          # mark the image as checked / not checked
+undo: [Ctrl+Z]               # undo the last change to this image
