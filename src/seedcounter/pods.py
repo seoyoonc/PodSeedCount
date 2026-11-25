@@ -35,6 +35,20 @@ class PodGeom:
 
 
 def pod_mask(rgb: np.ndarray, cfg: dict) -> np.ndarray:
+    """Pod pixels (bool). ``pods.method`` chooses how:
+
+    * ``colour`` (default): colour distance from the background, with an edge step that closes the
+      outline. Finds pale pod walls and pale bud ends, which differ from the white background by only a
+      few colour units.
+    * ``saturation``: the earlier method, a fixed saturation margin above the background. Pale parts of a
+      pod fall below the margin, so pods can break apart and lose their pale ends.
+    """
+    if cfg["pods"].get("method", "colour") == "saturation":
+        return _pod_mask_saturation(rgb, cfg)
+    return pod_mask_colour(rgb, cfg)[0]
+
+
+def _pod_mask_saturation(rgb: np.ndarray, cfg: dict) -> np.ndarray:
     hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
     sat = cv2.GaussianBlur(hsv[..., 1], (0, 0), 2).astype(np.float32)
     val = hsv[..., 2]
@@ -43,6 +57,80 @@ def pod_mask(rgb: np.ndarray, cfg: dict) -> np.ndarray:
     mask = sat > bg_sat + cfg["pods"]["saturation_margin"]
     mask = ndi.binary_opening(mask, iterations=2)
     return ndi.binary_fill_holes(mask)
+
+
+def background_distance(rgb: np.ndarray, cfg: dict) -> tuple[np.ndarray, np.ndarray, float]:
+    """Colour distance (CIE Lab, Delta E) of every pixel from the background colour.
+
+    The background is the bright, least-coloured part of the image. Its colour is fitted as a smooth
+    surface (2nd-order polynomial per Lab channel), so uneven illumination and vignetting do not look
+    like pod. Returns the distance map, the background pixels used, and the background noise (robust SD
+    of the distance on the background).
+    """
+    pc = cfg["pods"]
+    lab = cv2.cvtColor(rgb.astype(np.float32) / 255.0, cv2.COLOR_RGB2LAB)
+    lab = cv2.GaussianBlur(lab, (0, 0), pc.get("colour_blur", 1.5))
+    hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
+    val, sat = hsv[..., 2], hsv[..., 1]
+    bright = val >= np.percentile(val, 60)
+    bg = bright & (sat <= np.percentile(sat[bright], 50) + 3) if bright.any() else bright
+    H, W = val.shape
+    ys, xs = np.nonzero(bg)
+    if ys.size < 50:                                # no usable background: plain median colour
+        field = np.broadcast_to(np.median(lab.reshape(-1, 3), axis=0), lab.shape)
+    else:
+        if ys.size > 20000:
+            pick = np.random.default_rng(0).choice(ys.size, 20000, replace=False)
+            ys, xs = ys[pick], xs[pick]
+
+        def terms(yy, xx):
+            yy, xx = yy / H - 0.5, xx / W - 0.5
+            return np.stack([np.ones_like(yy), xx, yy, xx * xx, yy * yy, xx * yy], -1)
+
+        coef = np.linalg.lstsq(terms(ys.astype(float), xs.astype(float)), lab[ys, xs], rcond=None)[0]
+        sh, sw = max(2, H // 8), max(2, W // 8)        # smooth surface: evaluate coarse, then resize
+        gy, gx = np.mgrid[0:sh, 0:sw].astype(np.float64)
+        coarse = (terms(gy * H / sh, gx * W / sw) @ coef).astype(np.float32)
+        field = cv2.resize(coarse, (W, H), interpolation=cv2.INTER_LINEAR)
+    d = np.linalg.norm(lab - field, axis=-1).astype(np.float32)
+    dn = d[bg] if bg.any() else d.ravel()
+    noise = float(1.4826 * np.median(np.abs(dn - np.median(dn))))
+    return d, bg, noise
+
+
+def pod_mask_colour(rgb: np.ndarray, cfg: dict) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Pod mask from colour distance to the background, closed with edges.
+
+    1. Distance map (``background_distance``). A pixel is pod if its distance is above ``low`` and it is
+       connected to clearly coloured pod (above ``strong_factor`` x ``low``): hysteresis, so isolated
+       specks of dust or noise do not count. ``low`` = max(``colour_threshold``, ``noise_factor`` x noise).
+    2. Canny edges of the distance map next to the pod close gaps in faint stretches of the outline.
+    3. A short closing along the pod axis bridges small notches, holes inside the pod are filled (seeds,
+       pale wall, bubbles), a small opening removes rough bits, and objects much smaller than the largest
+       pod are dropped.
+    Returns the mask, the distance map and the edge map (for display / debugging).
+    """
+    from skimage.filters import apply_hysteresis_threshold
+
+    pc = cfg["pods"]
+    d, _bg, noise = background_distance(rgb, cfg)
+    low = max(pc.get("colour_threshold", 2.0), pc.get("noise_factor", 5.0) * noise)
+    high = pc.get("strong_factor", 3.0) * low
+    region = apply_hysteresis_threshold(d, low, high)
+    d8 = np.clip(d * (255.0 / (4 * high)), 0, 255).astype(np.uint8)
+    edges = cv2.Canny(d8, 10, 30, L2gradient=True) > 0
+    near = ndi.binary_dilation(region, iterations=max(2, int(round(0.004 * rgb.shape[1]))))
+    mask = region | (edges & near)
+    length = max(3, int(round(pc.get("close_length", 0.02) * rgb.shape[1])) | 1)
+    ker = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (length, 3))
+    mask = cv2.morphologyEx(mask.astype(np.uint8), cv2.MORPH_CLOSE, ker) > 0
+    mask = ndi.binary_fill_holes(mask)
+    mask = ndi.binary_opening(mask, iterations=2)
+    lab, n = ndi.label(mask)
+    if n > 1:
+        sizes = ndi.sum(mask, lab, range(1, n + 1))
+        mask = np.isin(lab, 1 + np.nonzero(sizes >= 0.05 * sizes.max())[0])
+    return mask, d, edges
 
 
 def _runs(col: np.ndarray) -> list[tuple[int, int]]:

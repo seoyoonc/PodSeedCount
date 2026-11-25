@@ -1,6 +1,6 @@
 # Seed counter: user manual
 
-Version 2.5.0. Installation is described in `SETUP.md`.
+Version 2.6.0. Installation is described in `SETUP.md`.
 
 The seed counter finds the pods in transmitted-light microscope images (`.tif`), counts the seeds in each pod,
 draws a border around every seed and tells you which counts it is unsure about. In the **review page** you
@@ -638,7 +638,14 @@ still used.
 ## 22. How the counting works
 
 1. **Loading**: the largest page of the TIFF (multi-page, compressed and 16-bit files are handled), analysed at half size.
-2. **Pods**: separated from the white background by colour saturation and numbered from top to bottom. Pods may
+2. **Pods**: found by their colour difference from the background and numbered from top to bottom. The background
+   colour is measured on the bright, colourless part of the image and fitted as a smooth surface, so uneven
+   lighting does not look like pod. A pixel is pod when its colour differs from the background by more than a small
+   amount (`pods.colour_threshold`, in Lab colour units; or 5 x the background noise if that is larger) and it joins
+   clearly coloured pod. Edges of this colour-difference map close faint stretches of the outline, small notches are
+   bridged along the pod, and holes inside the pod are filled. Pale pod walls and the pale bud end, which differ from
+   the white background by only a few colour units, are kept, so pods no longer break apart or lose their bud half.
+   The earlier method (a fixed saturation margin) is still available with `pods.method: saturation`. Pods may
    touch or overlap: where a column of the pod area is much taller than one pod (1.4 pod widths), two pods are
    fused there. They are cut apart along a smooth seam through the palest pixels; where the two pods part next to
    the fused stretch, the seam is joined to that real gap, otherwise it is followed until they part. Such pods are
@@ -702,6 +709,6 @@ Expect larger errors on new kinds of images until some of them are checked and t
 | *Cannot reach the review server* in the page | The program was stopped: start it again and reload the page |
 | A key does nothing | Click on the image first (a box or dialog may have the focus); check the Keys list for the current shortcuts |
 | A red message about the shortcut file | Fix the line it names in `config\keybindings.yaml` and reload the page |
-| An image has far too many or too few pods | The background may not be white enough, or the pods very pale: see `pods.saturation_margin` in the settings |
+| An image has far too many or too few pods | Too many (dust, smudges, the slide edge counted as pods): raise `pods.colour_threshold`, e.g. to 4. Pods missing or cut short: lower it, e.g. to 1.5. With `pods.method: saturation`, use `pods.saturation_margin` instead |
 | *Application Control* or *blocked* messages | See `SETUP.md`, section 7 |
 | A double-clicked `.bat` file does nothing | See `SETUP.md`, sections 7 and 8, or use the typed command |

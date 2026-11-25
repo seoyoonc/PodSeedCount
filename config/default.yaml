@@ -12,7 +12,13 @@ processing:
   auto_radius_tolerance: 0.30   # re-run only if the estimate differs by more than 30 %
 
 pods:
-  saturation_margin: 30         # pod = pixels this much more saturated than the white background
+  method: colour                # colour = colour distance from the background + edges; saturation = earlier method
+  colour_threshold: 2.0         # colour: pod = at least this far from the background colour (Lab Delta E) ...
+  noise_factor: 5.0             # ... and at least this many times the background noise
+  strong_factor: 3.0            # each pod must contain colour at least this many times the threshold
+  close_length: 0.02            # length of the gap-closing step along the pod, as a fraction of image width
+  colour_blur: 1.5              # smoothing before measuring colour, in work pixels
+  saturation_margin: 30         # saturation method only: pod = this much more saturated than the background
   min_area_frac: 0.2            # ignore objects smaller than 20 % of the largest pod
   left_body_frac: 0.6           # bud end: seeds start where the pod reaches 60 % of its width
   right_body_frac: 0.6          # stem end: pod ends where its width drops below 60 %
