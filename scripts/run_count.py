@@ -51,6 +51,9 @@ def main(argv=None):
         counts = ", ".join(str(r["seed_count"]) for r in s["pod_rows"]) or s.get("note", "")
         print(f"  {s['image']}: {s['seeds']} seeds [{counts}]  needs review: {s['needs_review']}")
     print(f"Report: {a.output}/report.html")
+    from seedcounter import __version__
+    from seedcounter.settings_info import fingerprint
+    print(f"Program version {__version__}, settings fingerprint {fingerprint(cfg)}")
     return 0
 
 

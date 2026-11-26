@@ -75,6 +75,8 @@ def make_handler(session: ReviewSession, keys_path=None):
             u = urlparse(self.path)
             q = parse_qs(u.query)
             try:
+                if u.path == "/favicon.ico":
+                    return self._send(204, b"", "image/x-icon")
                 if u.path in ("/", "/index.html"):
                     return self._send(200, (STATIC / "index.html").read_bytes(), "text/html; charset=utf-8")
                 if u.path == "/api/images":
@@ -95,6 +97,20 @@ def make_handler(session: ReviewSession, keys_path=None):
                     return self._send(200, desk.preview(m.group(1)), "image/jpeg")
                 if u.path == "/api/job":
                     return self._json(_job())
+                if u.path == "/api/removed":
+                    return self._json({"removed": session.removed()})
+                if u.path == "/api/settings":
+                    return self._json(session.settings_report())
+                if u.path == "/api/settings/file":
+                    body = session.settings_file()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/x-yaml; charset=utf-8")
+                    self.send_header("Content-Disposition", 'attachment; filename="seedcounter-settings.yaml"')
+                    self.send_header("Content-Length", str(len(body)))
+                    self.send_header("Cache-Control", "no-store")
+                    self.end_headers()
+                    self.wfile.write(body)
+                    return
                 m = re.fullmatch(r"/api/image/(\d+)", u.path)
                 if m:
                     return self._json(session.payload(self._image_id(m), self._cfg(q)))
@@ -115,6 +131,9 @@ def make_handler(session: ReviewSession, keys_path=None):
                 name = q.get("name", [""])[0]
                 if u.path == "/api/upload/image":
                     return self._json(save_input_image(session, name, self._raw()))
+                if u.path == "/api/settings/load":
+                    session.start_load_settings(self._raw())
+                    return self._json(_job())
                 if u.path == "/api/upload/annotation":
                     return self._json(desk.stage(q.get("token", [""])[0], q.get("role", [""])[0], name, self._raw()))
                 body = self._body()
@@ -143,7 +162,16 @@ def make_handler(session: ReviewSession, keys_path=None):
                         session.discard(key)
                     return self._json(session.payload(i, cfg))
                 if u.path == "/api/export":
-                    return self._json(session.export(cfg))
+                    keys = body.get("images")
+                    return self._json(session.export(cfg, None if keys is None else [str(k) for k in keys]))
+                m = re.fullmatch(r"/api/image/(\d+)/remove", u.path)
+                if m:
+                    return self._json(session.remove(session.keys[self._image_id(m)]))
+                if u.path == "/api/removed/restore":
+                    return self._json(session.restore(str(body.get("key", ""))))
+                if u.path == "/api/settings/reset":
+                    session.start_reset_settings()
+                    return self._json(_job())
                 if u.path == "/api/calibrate":
                     session.start_calibration(bool(body.get("use_gt", True)), bool(body.get("sweep", True)))
                     return self._json(_job())

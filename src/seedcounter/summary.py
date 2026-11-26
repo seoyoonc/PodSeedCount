@@ -77,7 +77,11 @@ def pod_summary(pod: Pod, cfg: dict, seed_radius_px: float, reviewed: bool = Fal
         conf = min(conf, cc["reject_threshold"])
     flag = review_flag(conf, cfg)
     reasons = []
-    if reviewed:
+    auto_flag = "no" if reviewed else flag
+    if pod.manual_flag:
+        flag = pod.manual_flag
+        reasons.append(f"flag set to '{flag}' by reviewer")
+    elif reviewed:
         flag = "no"
         reasons.append("checked by reviewer")
     elif flag != "no":
@@ -112,6 +116,8 @@ def pod_summary(pod: Pod, cfg: dict, seed_radius_px: float, reviewed: bool = Fal
         **counts,
         "pod_confidence": round(conf, 2),
         "needs_review": flag,
+        "auto_needs_review": auto_flag,
+        "flag_source": "reviewer" if pod.manual_flag else "automatic",
         "reason": "; ".join(reasons),
         "reviewed": "yes" if reviewed else "no",
     }
@@ -120,12 +126,16 @@ def pod_summary(pod: Pod, cfg: dict, seed_radius_px: float, reviewed: bool = Fal
 def image_summary(img: ImageResult, cfg: dict) -> dict:
     if img.error:
         return {"image": img.image, "pods": 0, "seeds": 0, "auto_seeds": 0, "change": 0, "abs_change": 0, "green": 0, "orange": 0, "red": 0,
-                "pods_no": 0, "pods_maybe": 0, "pods_yes": 0, "needs_review": "error", "reviewed": "no",
+                "pods_no": 0, "pods_maybe": 0, "pods_yes": 0, "needs_review": "error", "auto_needs_review": "error",
+                "flag_source": "automatic", "reviewed": "no",
                 "annotated_image": "", "pod_rows": [], "note": img.error}
     rows = [pod_summary(p, cfg, img.seed_radius_px, img.reviewed) for p in img.active_pods()]
     status = max((r["needs_review"] for r in rows), key=REVIEW_RANK.get, default="yes")
     if img.reviewed:
         status = "no"
+    auto_status = status
+    if img.manual_flag:
+        status = img.manual_flag
     note = "; ".join(img.warnings) if img.warnings else ""
     ignored = [p.index for p in img.pods if p.status != "active"]
     if ignored:
@@ -146,6 +156,8 @@ def image_summary(img: ImageResult, cfg: dict) -> dict:
         "pods_maybe": sum(r["needs_review"] == "maybe" for r in rows),
         "pods_yes": sum(r["needs_review"] == "yes" for r in rows),
         "needs_review": status,
+        "auto_needs_review": auto_status,
+        "flag_source": "reviewer" if img.manual_flag else "automatic",
         "reviewed": "yes" if img.reviewed else "no",
         "annotated_image": img.annotated_image or "",
         "pod_rows": rows,

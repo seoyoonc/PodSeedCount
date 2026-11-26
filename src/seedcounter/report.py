@@ -8,12 +8,13 @@ import json
 from pathlib import Path
 
 from .model import RunResult, to_dict
+from .settings_info import fingerprint
 from .summary import REVIEW_RANK, image_summary, seed_class
 
 IMAGE_FIELDS = ["image", "pods", "seeds", "auto_seeds", "change", "green", "orange", "red", "pods_no", "pods_maybe", "pods_yes",
-                "needs_review", "reviewed", "note", "annotated_image"]
+                "needs_review", "flag_source", "reviewed", "note", "annotated_image"]
 POD_FIELDS = ["image", "pod", "seed_count", "auto_count", "change", "top_row", "bottom_row", "green", "orange", "red",
-              "pod_confidence", "needs_review", "reviewed", "reason"]
+              "pod_confidence", "needs_review", "flag_source", "reviewed", "reason"]
 SEED_FIELDS = ["image", "pod", "seed_id", "row", "x_px", "y_px", "area_px", "major_px", "minor_px",
                "confidence", "class", "status", "source"]
 
@@ -104,7 +105,8 @@ def write_json(run: RunResult, cfg: dict, path: Path, sums: list[dict]) -> Path 
         return None
     tot = run_totals(sums)
     data = {
-        "run": {"date": run.date, "version": run.version, "config_file": run.config_file, "input_dir": run.input_dir,
+        "run": {"date": run.date, "version": run.version, "settings_fingerprint": fingerprint(run.config or cfg),
+                "config_file": run.config_file, "input_dir": run.input_dir,
                 "review_threshold": cfg["confidence"]["review_threshold"],
                 "reject_threshold": cfg["confidence"]["reject_threshold"],
                 "images_processed": tot["images_processed"], "images_needing_review": tot["images_needing_review"],
@@ -215,7 +217,7 @@ def write_html(run: RunResult, cfg: dict, path: Path, sums: list[dict], thumbs: 
         flagged = f'{s["pods_maybe"]} maybe, {s["pods_yes"]} yes' if s["needs_review"] != "error" else "not processed"
         overview.append(
             f'<tr data-status="{_esc(s["needs_review"])}"><td><a href="#{a}">{_esc(img.image)}</a></td>'
-            f'<td>{_chip(s["needs_review"])}{" <span class=rev>reviewed</span>" if s.get("reviewed") == "yes" else ""}</td><td class="n">{s["pods"]}</td><td class="n">{s["seeds"]}{_chg(s["change"])}</td>'
+            f'<td>{_chip(s["needs_review"])}{" <span class=rev>flag set by reviewer</span>" if s.get("flag_source") == "reviewer" else ""}{" <span class=rev>reviewed</span>" if s.get("reviewed") == "yes" else ""}</td><td class="n">{s["pods"]}</td><td class="n">{s["seeds"]}{_chg(s["change"])}</td>'
             f'<td>{_bar(s["green"], s["orange"], s["red"])}</td><td class="n">{flagged}</td></tr>')
         pod_html = []
         pods_by_index = {p.index: p for p in img.pods}
@@ -256,7 +258,9 @@ def write_html(run: RunResult, cfg: dict, path: Path, sums: list[dict], thumbs: 
 <title>Seed count report</title><style>{CSS}</style></head><body><main>
 <header><h1>Seed count report</h1>
 <p class="sub">Run {_esc(run.date)}, {_esc(Path(run.config_file).name)}, review threshold {c["review_threshold"]:.2f},
-reject threshold {c["reject_threshold"]:.2f}, input {_esc(run.input_dir)}</p></header>
+reject threshold {c["reject_threshold"]:.2f}, input {_esc(run.input_dir)}<br>
+Program version {_esc(run.version)}, settings fingerprint <b>{_esc(fingerprint(run.config or cfg))}</b>
+(the same fingerprint means identical counting)</p></header>
 <p class="verdict"><b>{n_rev} of {len(sums)}</b> images need review</p>{_accuracy(tot)}
 <div class="scroll"><table><thead><tr><th>Image</th><th>Needs review</th><th>Pods</th><th>Seeds</th>
 <th>Green / orange / red seeds</th><th>Flagged pods</th></tr></thead><tbody>{"".join(overview)}</tbody></table></div>

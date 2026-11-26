@@ -14,6 +14,7 @@
   --bg:#161916;--surface:#1f231f;--ink:#e7eae3;--muted:#a2aa9f;--line:#343a33;--stage:#0f110f;
   --pod:#b9a35c;--g:#5cbf6a;--o:#f0a04b;--r:#ee6d62;--m:#e070e0;--link:#8fb8dc;--sel:#8fb8dc;color-scheme:dark}}
 *{box-sizing:border-box}
+[hidden]{display:none !important}
 html,body{height:100%;margin:0}
 body{background:var(--bg);color:var(--ink);font:14px/1.45 "Segoe UI","Noto Sans","Helvetica Neue",Arial,sans-serif;
   font-variant-numeric:tabular-nums;display:grid;grid-template-rows:auto 1fr;overflow:hidden}
@@ -118,6 +119,24 @@ dialog.wide{max-width:1100px}
 .ok{color:var(--g);font-weight:700}.bad{color:var(--r);font-weight:600}
 @media (max-width:900px){.annview{grid-template-columns:1fr}}
 select{font:inherit;color:inherit;background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:4px 6px}
+.mine{font-size:11px;color:var(--muted);margin-left:3px}
+.pickrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0}
+.picklist{max-height:46vh;overflow:auto;border:1px solid var(--line);border-radius:6px}
+.picklist label{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;margin:0;padding:5px 10px;border-bottom:1px solid var(--line)}
+.picklist label:last-child{border-bottom:0}
+.settings td{white-space:normal;vertical-align:top}
+.settings td.k{font-family:ui-monospace,Consolas,monospace;font-size:12px;white-space:nowrap}
+.settings tr.chg td{background:color-mix(in srgb,var(--o) 12%,transparent)}
+.settings tbody tr{cursor:default}
+button.danger{color:var(--r)}
+details{margin:10px 0}details summary{cursor:pointer;color:var(--link);font-weight:600}
+details.topic{border:1px solid var(--line);border-radius:6px;padding:8px 12px;margin:8px 0;background:var(--surface)}
+details.topic>summary{display:flex;gap:10px;align-items:center;color:var(--ink);font-size:15px}
+details.topic>summary span:first-child{flex:1}
+details.tech{margin:8px 0 4px}details.tech>summary{font-weight:500;font-size:13px}
+.setting{display:grid;grid-template-columns:1fr 220px;gap:14px;padding:7px 0;border-top:1px solid var(--line)}
+.setting .val{font-weight:600}.setting.chg{background:color-mix(in srgb,var(--o) 12%,transparent)}
+#setStatus p{margin:4px 0}
 @media (max-width:1200px){.app{grid-template-columns:200px 1fr 340px}}
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
@@ -133,11 +152,11 @@ select{font:inherit;color:inherit;background:var(--surface);border:1px solid var
   </div>
   <div class="spacer"></div>
   <button id="addImgBtn" title="Add TIFF images to the input folder">Add images</button>
-  <button id="addAnnBtn" title="Add a raw image with its annotated copy as ground truth">Add annotation</button>
   <button id="ovBtn" data-tip="All images at a glance, with progress" data-ka="overview">Overview</button>
   <button id="learnBtn" title="Improve the automatic counting from the images you have checked">Learn from reviews</button>
+  <button id="setBtn" title="View, export or import settings">Settings</button>
   <button id="undo" data-tip="Undo the last change to this image" data-ka="undo">Undo</button>
-  <button id="export" class="primary" title="Write report, tables and annotated images with your corrections">Save results</button>
+  <button id="export" class="primary" title="Choose images, then write report, tables and annotated images with your corrections">Save results</button>
 </header>
 
 <div class="app">
@@ -150,6 +169,7 @@ select{font:inherit;color:inherit;background:var(--surface);border:1px solid var
       <button id="mAdd" data-tip="Draw a missed seed: drag an ellipse over it" data-ka="add_mode">Add seed</button>
       <button id="mSplit" data-tip="Two seeds in one border: drag a line through it where they meet" data-ka="split_mode">Split seed</button>
       <button id="mRedraw" data-tip="Wrong border: select a seed, then trace its correct outline" data-ka="redraw_mode">Redraw border</button>
+      <button id="mPod" data-tip="A pod was missed: trace its outline in one stroke; seeds inside it are then found">Draw pod</button>
       <span class="sep"></span>
       <button id="fit" data-tip="Show the whole image" data-ka="fit">Fit</button>
       <span class="sep"></span>
@@ -175,7 +195,7 @@ select{font:inherit;color:inherit;background:var(--surface);border:1px solid var
         <th data-k="todo">Orange / red</th><th data-k="pods_flagged">Flagged pods</th><th data-k="redrawn" title="seeds whose border you redrew; only these teach border shape">Redrawn</th><th data-k="edits">Edits</th>
       </tr></thead><tbody id="ovBody"></tbody></table>
     </div>
-    <div class="loading">Loading image</div>
+    <div class="loading" id="loadingMsg">Loading image</div>
     <div class="empty-state" id="emptyState" hidden>
       <p class="big">No images yet</p>
       <p>Add TIFF images to start reviewing. They are copied into the input folder and analysed.</p>
@@ -186,12 +206,15 @@ select{font:inherit;color:inherit;background:var(--surface);border:1px solid var
   <section class="panel" aria-label="Details">
     <h2 id="imgName">No image</h2>
     <div class="row"><span id="imgChip"></span><span id="imgCount"></span></div>
+    <div class="row"><label for="flagSel" style="color:var(--muted)">Review flag</label><select id="flagSel"
+      title="Override the program's flag, e.g. when a pod is clearly wrong but marked 'no'"></select></div>
     <div class="row"><span id="imgBar"></span></div>
     <div class="mini" id="imgAuto"></div>
     <div class="notes" id="notes"></div>
     <div class="row">
       <button id="checked" data-tip="Mark the whole image as checked" data-ka="toggle_checked">Mark image as checked</button>
       <button id="discard" title="Remove all your changes to this image and analyse it again">Discard edits</button>
+      <button id="removeImg" class="danger" title="Take this image out of the list (the file and your review are moved to output/review/removed, not deleted)">Remove from list</button>
     </div>
 
     <h3>Selection</h3>
@@ -217,30 +240,40 @@ select{font:inherit;color:inherit;background:var(--surface);border:1px solid var
     <span>Drop .tif files here, or <u>choose files</u></span>
   </label>
   <div id="imgStatus"></div>
+  <h3 style="margin-top:16px">Removed images</h3>
+  <div id="removedList" class="mini"></div>
   <div class="row" style="justify-content:flex-end;margin-top:12px"><button id="imgClose">Close</button></div>
 </dialog>
-<dialog id="addAnn" aria-labelledby="addAnnTitle" class="wide">
-  <h2 id="addAnnTitle">Add annotation</h2>
-  <p>Choose the raw TIFF and its annotated copy (the full image, with closed white outlines around the seeds), then
-  type the number of seeds in each pod. The program counts the outlined shapes per pod and compares them with your counts.</p>
-  <div class="pick">
-    <label>Raw image (.tif) <input type="file" id="annRaw" accept=".tif,.tiff"></label>
-    <label>Annotated image <input type="file" id="annImg" accept=".png,.jpg,.jpeg,.tif,.tiff,.bmp"></label>
-    <button id="annCheck" class="primary" disabled>Check</button>
+<dialog id="saveDlg" aria-labelledby="saveTitle">
+  <h2 id="saveTitle">Save results</h2>
+  <p>The report, tables and annotated images are written to the output folder for the images you select, with your
+  corrections and flags. Images you leave out are not in the report or tables.</p>
+  <div class="pickrow"><span>Select</span><button data-pick="all">All</button><button data-pick="checked">Checked</button>
+    <button data-pick="unchecked">Not checked</button><button data-pick="none">None</button><span class="spacer"></span><span id="saveCount" class="mini"></span></div>
+  <div class="picklist" id="saveList"></div>
+  <div class="row" style="justify-content:flex-end;margin-top:12px"><button id="saveClose">Cancel</button><button id="saveGo" class="primary">Save</button></div>
+</dialog>
+<dialog id="setDlg" aria-labelledby="setTitle" class="wide">
+  <h2 id="setTitle">Settings</h2>
+  <div class="card" id="setStatus"></div>
+  <div class="row" style="margin-top:10px">
+    <button id="setDownload" title="Save the settings file, e.g. for another computer">Export settings</button>
+    <button id="setLoad" title="Use a settings file exported on another computer">Import settings</button>
+    <input type="file" id="setFile" accept=".yaml,.yml" hidden>
+    <span class="spacer"></span>
+    <button id="setReset" class="danger" title="Go back to the standard settings (the current file is kept as a backup)">Reset to standard</button>
   </div>
-  <div id="annResult"></div>
-  <div class="row" style="justify-content:flex-end;margin-top:12px">
-    <button id="annClose">Close</button><button id="annSave" class="primary" hidden>Save annotation</button>
-  </div>
-  <h3 style="margin-top:16px">Annotations in the ground-truth folder</h3>
-  <div id="annList" class="mini"></div>
+  <div id="setGroups" style="margin-top:12px"></div>
+  <details id="setBakBox"><summary id="setBakSum">Backup</summary><div id="setBak"></div></details>
+  <p class="mini" style="margin-top:14px">To change settings, use Learn from reviews.</p>
+  <div class="row" style="justify-content:flex-end;margin-top:12px"><button id="setClose">Close</button></div>
 </dialog>
 <dialog id="learn" aria-labelledby="learnTitle">
   <h2 id="learnTitle">Learn from reviews</h2>
   <p>Images you marked as checked become ground truth: your accepted, rejected, split and added seeds show the
   program which seeds are right, and the borders you redrew show it the right seed shapes (accepting a seed does
   not count as approving its border). The settings are then tuned on them (together with the annotations in ground_truth/).</p>
-  <label><input type="checkbox" id="lnGt" checked> Also use the annotated images in ground_truth/</label>
+  <label id="lnGtRow" hidden><input type="checkbox" id="lnGt" checked> <span id="lnGtText">Also use the annotated images in ground_truth/</span></label>
   <label><input type="checkbox" id="lnSweep" checked> Also tune the detection settings (slower; otherwise only the confidence colours)</label>
   <div id="lnBody"></div>
   <div class="row" style="justify-content:flex-end;margin-top:12px">
@@ -258,7 +291,8 @@ const S = {
   view: {scale: 1, ox: 0, oy: 0}, mode: "select", sel: null, drag: null, draw: null, line: null,
   paths: new Map(), ovSort: {k: "status", dir: -1},
 };
-const MODES = {select: "mSelect", add: "mAdd", split: "mSplit", redraw: "mRedraw"};
+const MODES = {select: "mSelect", add: "mAdd", split: "mSplit", redraw: "mRedraw", addpod: "mPod"};
+const TRACE = new Set(["redraw", "redrawpod", "addpod"]);   // modes that trace a closed outline
 const HINT = {
   select: "Click a seed, a dashed dark area or an empty part of a pod.",
   add: "Drag an ellipse over a missed seed inside a pod.",
@@ -267,7 +301,10 @@ const HINT = {
   splitpod: "Drag a line through the pod where the two pods should be separated.",
   cutbud: "Click in the pod where the bud cut should be. Nothing left of it is counted.",
   cutstem: "Click in the pod where the stem cut should be. Nothing right of it is counted.",
+  redrawpod: "Trace the correct outline of the selected pod in one stroke, from the bud tip round the whole pod; releasing the mouse closes it.",
+  addpod: "Trace the outline of the missed pod in one stroke, from the bud tip round the whole pod; releasing the mouse closes it.",
 };
+const FLAG_TXT = {no: "no", maybe: "maybe", yes: "yes"};
 
 // ------------------------------------------------------------------ keyboard shortcuts (config/keybindings.yaml)
 let KEYS = {}, KEYDESC = {}, KEYMAP = new Map();
@@ -350,6 +387,7 @@ function setPayload(p) {
   }
   const li = S.images.find(x => x.id === p.id);
   if (li) Object.assign(li, {seeds: p.summary.seeds, needs_review: p.summary.needs_review, reviewed: p.reviewed,
+    manual_flag: p.manual_flag, auto_needs_review: p.summary.auto_needs_review,
     edits: p.edits, orange: p.summary.orange, red: p.summary.red, pods: p.summary.pods});
   validateSel(); renderPanel(); renderList();
 }
@@ -552,9 +590,9 @@ function bar(g, o, r) {
 function renderEmpty() {
   const none = !S.images.length;
   $("emptyState").hidden = !none;
-  for (const id of ["export", "checked", "discard", "next", "undo"]) if (none) $(id).disabled = true;
+  for (const id of ["export", "checked", "discard", "next", "undo", "removeImg", "flagSel"]) if (none) $(id).disabled = true;
   if (none) { $("list").innerHTML = '<li class="mini" style="padding:8px">No images yet.</li>'; $("sel").innerHTML = ""; $("pods").innerHTML = ""; }
-  else $("export").disabled = false;
+  else { $("export").disabled = false; $("removeImg").disabled = false; $("flagSel").disabled = false; }
   return none;
 }
 function renderList() {
@@ -565,14 +603,15 @@ function renderList() {
       : `${im.seeds} seeds, ${im.pods} pods${left ? `, ${left} to check` : ""}${im.edits ? `, ${im.edits} edit${im.edits > 1 ? "s" : ""}` : ""}`;
     return `<li><button data-id="${im.id}" data-status="${esc(im.needs_review)}" aria-current="${im.id === S.id}">
       <span class="nm" title="${esc(im.key)}">${esc(im.key)}</span>
-      <span>${im.reviewed ? '<span class="done" title="Checked">&#10003;</span> ' : ""}${chip(im.needs_review)}</span>
+      <span>${im.reviewed ? '<span class="done" title="Checked">&#10003;</span> ' : ""}${chip(im.needs_review)}${im.manual_flag ? `<span class="mine" title="Flag set by you (automatic: ${esc(im.auto_needs_review)})">&#9998;</span>` : ""}</span>
       <span class="meta">${meta}</span></button></li>`;
   }).join("");
 }
 function renderPanel() {
   const p = S.cur, s = p.summary;
   $("imgName").textContent = p.key;
-  $("imgChip").innerHTML = chip(s.needs_review) + (p.reviewed ? ' <span class="done">&#10003; checked</span>' : "");
+  $("imgChip").innerHTML = chip(s.needs_review) + (p.manual_flag ? ' <span class="mine">set by you</span>' : "") + (p.reviewed ? ' <span class="done">&#10003; checked</span>' : "");
+  $("flagSel").innerHTML = flagOptions(p.manual_flag, s.auto_needs_review);
   $("imgCount").textContent = `${s.seeds} seeds in ${s.pods} pods`;
   $("imgBar").innerHTML = bar(s.green, s.orange, s.red) + ` <span style="color:var(--muted)">${s.green} / ${s.orange} / ${s.red}</span>`;
   $("imgAuto").textContent = s.change ? `Automatic count ${s.auto_seeds}, now ${s.seeds} (${sign(s.change)}).` : `Automatic count ${s.auto_seeds}.`;
@@ -584,13 +623,17 @@ function renderPanel() {
     if (!r) return `<tr data-pod="${pod.index}"><td>Pod ${pod.index}</td><td colspan="5" class="mini">ignored (not a pod)</td></tr>`;
     return `<tr data-pod="${pod.index}"><td>Pod ${pod.index}</td><td class="n"><b>${r.seed_count}</b></td>
       <td class="n mini">${r.auto_count}${r.change ? ` (${sign(r.change)})` : ""}</td>
-      <td>${bar(r.green, r.orange, r.red)}</td><td class="n">${r.pod_confidence.toFixed(2)}</td><td>${chip(r.needs_review)}</td></tr>`
+      <td>${bar(r.green, r.orange, r.red)}</td><td class="n">${r.pod_confidence.toFixed(2)}</td><td>${chip(r.needs_review)}${pod.manual_flag ? '<span class="mine" title="set by you">&#9998;</span>' : ""}</td></tr>`
       + (r.reason ? `<tr class="reason"><td colspan="6">${esc(r.reason)}</td></tr>` : "");
   }).join("");
   const todo = checkList().length;
   $("next").textContent = todo ? `Next to check (${todo} left)` : "Nothing left to check";
   $("next").disabled = !todo;
   renderSel();
+}
+function flagOptions(manual, auto) {
+  return `<option value="" ${manual ? "" : "selected"}>automatic (${esc(auto)})</option>`
+    + ["no", "maybe", "yes"].map(v => `<option value="${v}" ${manual === v ? "selected" : ""}>${v} (set by you)</option>`).join("");
 }
 function validateSel() {
   if (!S.sel || !S.cur) return;
@@ -599,10 +642,9 @@ function validateSel() {
 }
 function renderSel() {
   const box = $("sel");
-  if (!S.cur || !S.sel || S.mode !== "select" && !S.mode.startsWith("cut") && S.mode !== "splitpod" && S.mode !== "redraw") {
-    box.innerHTML = `<p class="empty">${HINT[S.mode]}</p>`; return;
-  }
+  if (!S.cur) { box.innerHTML = ""; return; }
   if (S.mode !== "select") { box.innerHTML = `<p class="empty">${HINT[S.mode]}</p><div class="row"><button data-act="cancel">Cancel ${K("cancel")}</button></div>`; return; }
+  if (!S.sel) { box.innerHTML = `<p class="empty">${HINT.select}</p>`; return; }
   if (S.sel.type === "seed") {
     const [pod, s] = findSeed(S.sel.id);
     if (!s) { S.sel = null; return renderSel(); }
@@ -648,6 +690,9 @@ function renderSel() {
       <dl><dt>Seeds</dt><dd>${r.seed_count} (top ${r.top_row}, bottom ${r.bottom_row})</dd>
       <dt>Automatic</dt><dd>${r.auto_count}${r.change ? ` (${sign(r.change)} by review)` : ""}</dd>
       <dt>Confidence</dt><dd>${r.pod_confidence.toFixed(2)}</dd></dl>
+      <div class="row"><label for="podFlag" style="color:var(--muted)">Review flag</label><select id="podFlag">${flagOptions(pod.manual_flag, r.auto_needs_review)}</select></div>
+      <div class="row"><button data-act="redrawpod" title="The pod outline is wrong: trace the correct one">Redraw outline</button>
+        <label style="color:var(--muted)" title="Find seeds again inside the new outline (seeds you added inside it are kept). Off: keep the current seeds and only rebuild midline and cuts."><input type="checkbox" id="podRecount" ${S.recount === false ? "" : "checked"}> find seeds again</label></div>
       <div class="row"><button data-act="cutbud">Move bud cut</button><button data-act="cutstem">Move stem cut</button></div>
       <div class="row"><button data-act="splitpod" title="Two touching pods were detected as one">Split pod</button>
         <button data-act="ignorepod" title="Not a pod, e.g. debris: do not count it">Not a pod</button></div>
@@ -679,7 +724,10 @@ function act(name) {
     if ((name === "undismiss" || name === "restore") && u.dismissed) edit({op: "undismiss", pod: pod.index, area: u.area});
   } else {
     const k = S.sel.pod;
-    if (name === "cutbud" || name === "cutstem" || name === "splitpod") setMode(name);
+    if (name === "cutbud" || name === "cutstem" || name === "splitpod" || name === "redrawpod") {
+      if (name === "redrawpod") S.recount = $("podRecount").checked;
+      setMode(name);
+    }
     if (name === "ignorepod") edit({op: "ignore_pod", pod: k});
     if (name === "restorepod") edit({op: "restore_pod", pod: k});
     if (name === "merge") { const o = +$("mergeWith").value; edit({op: "merge_pods", pods: [k, o]}).then(ok => ok && toast(`Pod ${o} merged into pod ${k}`)); }
@@ -723,7 +771,7 @@ function nextToCheck(dir = 1, afterDecision = false) {
   renderSel(); focusOn(it.pts);
 }
 function setMode(m) {
-  if ((m === "cutbud" || m === "cutstem" || m === "splitpod") && !(S.sel && S.sel.type === "pod")) return toast("Select a pod first: click an empty part of it");
+  if ((m === "cutbud" || m === "cutstem" || m === "splitpod" || m === "redrawpod") && !(S.sel && S.sel.type === "pod")) return toast("Select a pod first: click an empty part of it");
   if (m === "redraw") {
     const s = S.sel && S.sel.type === "seed" ? findSeed(S.sel.id)[1] : null;
     if (!s || s.status !== "active") return toast(`Select a counted seed first${keyText("redraw_mode") ? `, then press ${keyText("redraw_mode")}` : ""}`);
@@ -732,6 +780,7 @@ function setMode(m) {
   S.mode = m; S.draw = null; S.line = null;
   for (const [k, id] of Object.entries(MODES)) $(id).classList.toggle("on", k === m);
   stage.classList.toggle("add", m !== "select");
+  if (m === "addpod") S.sel = null;
   renderSel(); draw();
 }
 
@@ -755,7 +804,7 @@ cv.addEventListener("pointerdown", e => {
     const [x, y] = toImage(mx, my);
     if (S.mode === "add") S.draw = {x0: x, y0: y, x1: x, y1: y};
     if (S.mode === "split" || S.mode === "splitpod") S.line = {x0: x, y0: y, x1: x, y1: y};
-    if (S.mode === "redraw") S.path = [[x, y]];
+    if (TRACE.has(S.mode)) S.path = [[x, y]];
   }
 });
 cv.addEventListener("pointermove", e => {
@@ -804,6 +853,28 @@ cv.addEventListener("pointerup", async e => {
     }
     const k = S.sel.pod;
     if (await edit({op: "split_pod", pod: k, line})) { toast(`Pod ${k} split in two`); S.sel = {type: "pod", pod: k}; setMode("select"); }
+    return;
+  }
+  if (!d.pan && (S.mode === "redrawpod" || S.mode === "addpod") && S.path) {
+    const path = S.path; S.path = null;
+    const [x0, y0, x1, y1] = bboxOf(path);
+    if (path.length < 12 || (x1 - x0) * S.view.scale < 30 || (y1 - y0) * S.view.scale < 8) { draw(); return toast("Trace all the way round the pod in one stroke"); }
+    const outline = path.map(([px_, py_]) => [+px_.toFixed(1), +py_.toFixed(1)]);
+    const redraw = S.mode === "redrawpod", k = redraw ? S.sel.pod : null;
+    const before = new Set(S.cur.pods.map(p => p.index));
+    const activeBefore = new Set(S.cur.pods.filter(p => p.status === "active").map(p => p.index));
+    $("loadingMsg").textContent = "Finding seeds in the pod"; stage.classList.add("busy");
+    const ok = await edit(redraw ? {op: "redraw_pod", pod: k, outline, recount: S.recount !== false} : {op: "add_pod", outline});
+    stage.classList.remove("busy"); $("loadingMsg").textContent = "Loading image";
+    if (ok) {
+      const nk = redraw ? k : (S.cur.pods.find(p => !before.has(p.index)) || {}).index;
+      if (nk !== undefined) S.sel = {type: "pod", pod: nk};
+      setMode("select");
+      const pod = nk !== undefined && findPod(nk);
+      const absorbed = S.cur.pods.filter(p => activeBefore.has(p.index) && p.status !== "active").map(p => p.index);
+      toast((redraw ? `Outline of pod ${k} redrawn${pod && pod.summary ? `: ${pod.summary.seed_count} seeds` : ""}` : `Pod ${nk} added${pod && pod.summary ? ` with ${pod.summary.seed_count} seeds` : ""}`)
+        + (absorbed.length ? `; pod${absorbed.length > 1 ? "s" : ""} ${absorbed.join(", ")} inside it no longer counted` : ""));
+    }
     return;
   }
   if (!d.pan && S.mode === "redraw" && S.path) {
@@ -896,7 +967,14 @@ async function pollJob() {
     else if (j.kind === "apply" && j.state === "done" && !pollJob.reloaded) { pollJob.reloaded = true; await loadList(); openImage(S.id, true); }
   } catch (err) { toast(err.message, true); }
 }
-$("learnBtn").onclick = () => { $("learn").showModal(); pollJob(); };
+$("learnBtn").onclick = async () => {
+  $("learn").showModal(); pollJob();
+  try {   // hand-made annotations (ground_truth/) are optional; offer them only if there are any
+    const d = await api("/api/annotations"), n = d.entries.length;
+    $("lnGtRow").hidden = !n; $("lnGt").checked = n > 0;
+    $("lnGtText").textContent = `Also use the ${n} hand-annotated image${n === 1 ? "" : "s"} in ground_truth/`;
+  } catch (e) { $("lnGtRow").hidden = true; $("lnGt").checked = false; }
+};
 $("lnClose").onclick = () => $("learn").close();
 $("lnStart").onclick = async () => {
   try { renderJob(await post("/api/calibrate", {use_gt: $("lnGt").checked, sweep: $("lnSweep").checked})); pollJob(); }
@@ -944,7 +1022,7 @@ async function addImages(files) {
   } catch (err) { show(`<p class="bad">${esc(err.message)}</p>`); }
 }
 $("emptyAdd").onclick = () => $("addImgBtn").click();
-$("addImgBtn").onclick = () => { $("imgStatus").innerHTML = ""; $("addImg").showModal(); };
+$("addImgBtn").onclick = () => { $("imgStatus").innerHTML = ""; removedList(); $("addImg").showModal(); };
 $("imgClose").onclick = () => $("addImg").close();
 $("imgFiles").onchange = e => { addImages(e.target.files); e.target.value = ""; };
 const drop = $("imgDrop");
@@ -952,85 +1030,6 @@ drop.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") 
 ["dragenter", "dragover"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add("over"); }));
 ["dragleave", "drop"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove("over"); }));
 drop.addEventListener("drop", e => addImages(e.dataTransfer.files));
-
-// ------------------------------------------------------------------ add annotation
-const ANN = {token: null, res: null};
-function annReady() { $("annCheck").disabled = !($("annRaw").files.length && $("annImg").files.length); }
-$("annRaw").onchange = annReady; $("annImg").onchange = annReady;
-async function annList() {
-  try {
-    const d = await api("/api/annotations");
-    $("annList").innerHTML = (d.entries.length ? `<table><tbody>${d.entries.map(e => `<tr><td>${esc(e.image)}</td>
-      <td>${e.pod_counts ? `${e.pod_counts.length} pods, ${e.pod_counts.reduce((a, b) => a + b, 0)} seeds` : "outline counts only"}</td>
-      <td><button data-rm="${esc(e.image)}">Remove</button></td></tr>`).join("")}</tbody></table>` : "<p>None yet.</p>")
-      + d.warnings.map(w => `<p>${esc(w)}</p>`).join("");
-  } catch (err) { $("annList").textContent = err.message; }
-}
-$("annList").addEventListener("click", async e => {
-  const b = e.target.closest("button[data-rm]"); if (!b) return;
-  if (!confirm(`Remove the annotation of ${b.dataset.rm}? Its files are moved to ground_truth/removed/.`)) return;
-  try { await post("/api/annotations/remove", {image: b.dataset.rm}); toast("Annotation removed"); annList(); } catch (err) { toast(err.message, true); }
-});
-function annCompare() {
-  const rows = [...document.querySelectorAll("#annPods tr[data-i]")];
-  let filled = 0, bad = 0;
-  for (const tr of rows) {
-    const p = ANN.res.pods[+tr.dataset.i], v = tr.querySelector("input").value.trim(), cell = tr.querySelector(".st");
-    if (v === "") { cell.innerHTML = ""; continue; }
-    filled++;
-    const n = +v, d = p.shapes - n;
-    if (!Number.isInteger(n) || n < 0) { cell.innerHTML = '<span class="bad">whole number</span>'; bad++; }
-    else if (d === 0) cell.innerHTML = '<span class="ok">&#10003; match</span>';
-    else { bad++; cell.innerHTML = `<span class="bad" title="${d > 0 ? "more outlined shapes than your count" : "fewer outlined shapes than your count"}">${d > 0 ? `${d} more` : `${-d} fewer`}</span>`; }
-  }
-  const all = filled === rows.length;
-  $("annSave").hidden = false; $("annSave").disabled = !all;
-  $("annSummary").innerHTML = !all ? `Type a count for every pod (${filled} of ${rows.length}).`
-    : bad ? `<span class="bad">${bad} pod${bad > 1 ? "s" : ""} differ.</span> Usually an outline is not closed (fewer shapes), or a gap between touching outlines was taken as a shape (more). Fix the annotation, or save anyway: your counts are then the truth, and the outlines are used for seed matching.`
-    : `<span class="ok">All pods match.</span>`;
-  return {all, bad};
-}
-$("annCheck").onclick = async () => {
-  const box = $("annResult"); $("annSave").hidden = true;
-  box.innerHTML = "<p>Uploading</p>";
-  try {
-    if (ANN.token) await post("/api/annotations/cancel", {token: ANN.token});
-    const raw = $("annRaw").files[0], ann = $("annImg").files[0];
-    const a = await upload(`/api/upload/annotation?role=raw&name=${encodeURIComponent(raw.name)}`, raw);
-    await upload(`/api/upload/annotation?role=annotation&token=${a.token}&name=${encodeURIComponent(ann.name)}`, ann);
-    box.innerHTML = "<p>Finding pods and outlined shapes</p>";
-    const r = await post("/api/annotations/check", {token: a.token});
-    ANN.token = a.token; ANN.res = r;
-    box.innerHTML = `<div class="annview"><a href="/api/annotations/preview/${r.token}" target="_blank" title="Open larger in a new tab"><img alt="Recognised outlines (magenta) on ${esc(r.raw)}" src="/api/annotations/preview/${r.token}?t=${Date.now()}"></a>
-      <div><p>Recognised shapes are drawn in magenta. ${r.shapes_total} shapes in total${r.shapes_outside ? `, <span class="bad">${r.shapes_outside} outside any pod</span>` : ""}.</p>
-      ${r.already_annotated ? `<p class="bad">${esc(r.raw)} is already annotated; remove the old annotation below before saving this one.</p>` : ""}
-      ${r.warnings.map(w => `<p class="mini">${esc(w)}</p>`).join("")}
-      <table><thead><tr><th>Pod</th><th>Shapes</th><th>Your count</th><th>Shapes vs. count</th></tr></thead><tbody id="annPods">
-      ${r.pods.map((p, i) => `<tr data-i="${i}"><td>Pod ${p.pod}</td><td class="n">${p.shapes}</td>
-        <td><input type="number" min="0" step="1" inputmode="numeric" aria-label="Seeds in pod ${p.pod}"></td><td class="st"></td></tr>`).join("")}
-      </tbody></table><p id="annSummary" class="mini"></p></div></div>`;
-    box.querySelectorAll("input").forEach(inp => inp.addEventListener("input", annCompare));
-    annCompare();
-    const first = box.querySelector("input"); if (first) first.focus();
-  } catch (err) { box.innerHTML = `<p class="bad">${esc(err.message)}</p>`; }
-};
-$("annSave").onclick = async () => {
-  const st = annCompare();
-  if (!st.all) return;
-  if (st.bad && !confirm(`${st.bad} pod(s) do not match the outlined shapes. Save anyway, with your counts as the truth?`)) return;
-  const counts = [...document.querySelectorAll("#annPods input")].map(i => +i.value);
-  try {
-    const r = await post("/api/annotations/save", {token: ANN.token, pod_counts: counts});
-    ANN.token = null; ANN.res = null;
-    $("annResult").innerHTML = `<p class="ok">Saved ${esc(r.image)} with ${r.pod_counts.length} pod counts.</p>`;
-    $("annSave").hidden = true; $("annRaw").value = ""; $("annImg").value = ""; annReady(); annList();
-  } catch (err) { toast(err.message, true); }
-};
-$("addAnnBtn").onclick = () => { $("addAnn").showModal(); annList(); };
-$("annClose").onclick = async () => {
-  if (ANN.token) { try { await post("/api/annotations/cancel", {token: ANN.token}); } catch (e) { /* ignore */ } ANN.token = null; }
-  $("addAnn").close();
-};
 
 // ------------------------------------------------------------------ keyboard and buttons
 const KEY_ACTIONS = {
@@ -1063,6 +1062,28 @@ $("mSelect").onclick = () => setMode("select");
 $("mAdd").onclick = () => setMode("add");
 $("mSplit").onclick = () => setMode("split");
 $("mRedraw").onclick = () => setMode("redraw");
+$("mPod").onclick = () => setMode(S.mode === "addpod" ? "select" : "addpod");
+$("flagSel").onchange = e => edit({op: "flag", value: e.target.value || null}).then(ok => ok && toast(e.target.value ? `Review flag set to '${e.target.value}'` : "Review flag back to automatic"));
+$("sel").addEventListener("change", e => {
+  if (e.target.id === "podFlag" && S.sel && S.sel.type === "pod") {
+    const k = S.sel.pod, v = e.target.value || null;
+    edit({op: "flag_pod", pod: k, value: v}).then(ok => ok && toast(v ? `Pod ${k} flagged '${v}'` : `Pod ${k}: flag back to automatic`));
+  }
+  if (e.target.id === "podRecount") S.recount = e.target.checked;
+});
+$("removeImg").onclick = async () => {
+  if (!S.cur) return;
+  const key = S.cur.key, edits = S.cur.edits;
+  if (!confirm(`Remove ${key} from the list?\n\nThe image file${edits ? ` and your ${edits} edit${edits > 1 ? "s" : ""}` : ""} are moved to ${S.outputDir}/review/removed (not deleted). It is then left out of Save results and Learn from reviews. You can bring it back under Add images.`)) return;
+  try {
+    const at = S.id;
+    await post(`/api/image/${at}/remove`);
+    S.id = null; S.cur = null; S.img = null; S.sel = null;
+    await loadList();
+    if (S.images.length) await openImage(Math.min(at, S.images.length - 1)); else { renderEmpty(); draw(); }
+    toast(`${key} removed from the list`);
+  } catch (err) { toast(err.message, true); }
+};
 $("fit").onclick = fit;
 $("undo").onclick = undo;
 $("next").onclick = () => nextToCheck(1);
@@ -1074,11 +1095,131 @@ $("discard").onclick = async () => {
   try { setPayload(await post(`/api/image/${S.id}/discard`)); S.sel = null; renderSel(); draw(); loadList(); toast("Changes removed"); }
   catch (err) { toast(err.message, true); }
 };
-$("export").onclick = async () => {
-  const b = $("export"); b.disabled = true; b.textContent = "Saving";
-  try { const r = await post("/api/export"); toast(`Saved ${r.images} images (${r.reviewed} checked) to ${S.outputDir}`); }
+// ------------------------------------------------------------------ save results (choose images)
+const SAVE_KEY = "seedreview.save.selection";
+function savedSelection() { try { return JSON.parse(localStorage.getItem(SAVE_KEY) || "null"); } catch (e) { return null; } }
+function rememberSelection(keys) { try { localStorage.setItem(SAVE_KEY, JSON.stringify(keys)); } catch (e) { /* not available */ } }
+function saveCount() {
+  const boxes = [...document.querySelectorAll("#saveList input")], n = boxes.filter(b => b.checked).length;
+  $("saveCount").textContent = `${n} of ${boxes.length} selected`; $("saveGo").disabled = !n;
+}
+function openSave() {
+  const prev = savedSelection(), keys = new Set(S.images.map(im => im.key));
+  let pick;
+  if (prev && prev.some(k => keys.has(k))) pick = new Set(prev);
+  else if (S.images.some(im => im.reviewed)) pick = new Set(S.images.filter(im => im.reviewed).map(im => im.key));
+  else pick = keys;
+  $("saveList").innerHTML = S.images.map(im => `<label><input type="checkbox" value="${esc(im.key)}" ${pick.has(im.key) ? "checked" : ""}>
+    <span>${esc(im.key)}</span><span class="mini">${im.seeds} seeds</span><span>${im.reviewed ? '<span class="done">&#10003;</span> ' : ""}${chip(im.needs_review)}</span></label>`).join("");
+  saveCount(); $("saveDlg").showModal();
+}
+$("saveList").addEventListener("change", saveCount);
+document.querySelector("#saveDlg .pickrow").addEventListener("click", e => {
+  const b = e.target.closest("button[data-pick]"); if (!b) return;
+  const byKey = new Map(S.images.map(im => [im.key, im]));
+  for (const box of document.querySelectorAll("#saveList input")) {
+    const im = byKey.get(box.value);
+    box.checked = {all: true, none: false, checked: !!im.reviewed, unchecked: !im.reviewed}[b.dataset.pick];
+  }
+  saveCount();
+});
+$("export").onclick = openSave;
+$("saveClose").onclick = () => $("saveDlg").close();
+$("saveGo").onclick = async () => {
+  const keys = [...document.querySelectorAll("#saveList input")].filter(b => b.checked).map(b => b.value);
+  const b = $("saveGo"); b.disabled = true; b.textContent = "Saving";
+  try {
+    const r = await post("/api/export", {images: keys});
+    rememberSelection(keys); $("saveDlg").close();
+    toast(`Saved ${r.images} of ${r.of} images (${r.reviewed} checked) to ${S.outputDir}`);
+  } catch (err) { toast(err.message, true); }
+  finally { b.disabled = false; b.textContent = "Save"; }
+};
+
+// ------------------------------------------------------------------ removed images
+async function removedList() {
+  try {
+    const d = await api("/api/removed");
+    $("removedList").innerHTML = d.removed.length ? `<table><tbody>${d.removed.map(r => `<tr><td>${esc(r.key)}</td>
+      <td>${r.edits ? `${r.edits} edit${r.edits > 1 ? "s" : ""}` : "no edits"}</td><td>${esc(r.removed.replace("T", " "))}</td>
+      <td>${r.in_list ? "already in the list" : `<button data-restore="${esc(r.key)}">Restore</button>`}</td></tr>`).join("")}</tbody></table>`
+      : "<p>None. Images you remove from the list appear here.</p>";
+  } catch (err) { $("removedList").textContent = err.message; }
+}
+$("removedList").addEventListener("click", async e => {
+  const b = e.target.closest("button[data-restore]"); if (!b) return;
+  try { await post("/api/removed/restore", {key: b.dataset.restore}); toast(`${b.dataset.restore} is back in the list`); await loadList(); removedList();
+    if (S.id === null && S.images.length) openImage(S.images.length - 1); }
   catch (err) { toast(err.message, true); }
-  finally { b.disabled = false; b.textContent = "Save results"; }
+});
+
+// ------------------------------------------------------------------ settings
+let SET = null;
+function techTable(rows) {
+  return `<table class="settings"><thead><tr><th>Setting</th><th>Value</th><th>Standard</th><th>Note</th></tr></thead>
+    <tbody>${rows.map(r => `<tr class="${r.changed ? "chg" : ""}"><td class="k">${esc(r.key)}</td><td><b>${esc(r.current)}</b></td>
+    <td>${esc(r.standard)}</td><td>${esc(r.explain || "")}</td></tr>`).join("")}</tbody></table>`;
+}
+function renderSettings() {
+  if (!SET) return;
+  const v = SET.version, std = SET.counting_is_standard && !SET.changed;
+  const changedMain = SET.groups.flatMap(g => g.main.filter(r => r.changed).map(r => `${r.name}: ${r.standard} &rarr; <b>${r.current}</b>`));
+  const changedTech = SET.groups.reduce((n, g) => n + g.technical.filter(r => r.changed).length, 0);
+  $("setStatus").innerHTML = (std
+    ? `<p><span class="ok">&#10003;</span> <b>Standard settings</b> (version ${esc(v)})</p>`
+    : `<p><b>${SET.changed} setting${SET.changed === 1 ? "" : "s"} changed</b> from standard (version ${esc(v)})</p>
+       ${changedMain.length ? `<ul class="mini" style="margin:4px 0 4px 18px;padding:0">${changedMain.map(t => `<li>${t}</li>`).join("")}</ul>` : ""}
+       ${changedTech ? `<p class="mini">+ ${changedTech} advanced</p>` : ""}`)
+    + `<p class="mini">Fingerprint: <b>${esc(SET.fingerprint)}</b>. Same fingerprint = same counts on any computer.</p>`;
+  $("setReset").disabled = std;
+  $("setGroups").innerHTML = SET.groups.map(g => `<details class="topic" ${g.changed ? "open" : ""}>
+    <summary><span>${esc(g.title)}</span> ${g.changed ? `<span class="chip maybe">${g.changed} changed</span>` : ""}</summary>
+    ${g.about ? `<p class="mini">${esc(g.about)}</p>` : ""}
+    ${g.main.map(r => `<div class="setting ${r.changed ? "chg" : ""}"><div><b>${esc(r.name)}</b>${r.explain ? `<div class="mini">${esc(r.explain)}</div>` : ""}</div>
+      <div class="val">${esc(r.current)}${r.changed ? `<div class="mini">standard ${esc(r.standard)}</div>` : ""}</div></div>`).join("")}
+    ${g.technical.length ? `<details class="tech"><summary>Advanced (${g.technical.length})${g.technical.some(r => r.changed) ? ", changed" : ""}</summary>${techTable(g.technical)}</details>` : ""}
+  </details>`).join("");
+  const b = SET.backup;
+  $("setBakBox").hidden = !b;
+  if (b) {
+    $("setBakSum").textContent = `Backup (${b.saved.replace("T", " ")})`;
+    $("setBak").innerHTML = `<p class="mini">Previous settings file, kept on this computer only: ${esc(b.file)}</p>`
+      + (b.differences.length ? techTable(b.differences.map(d => ({key: d.key, current: d.current, standard: d.backup, explain: d.description, changed: true})))
+          .replace("<th>Standard</th>", "<th>Backup</th>") : "");
+  }
+}
+async function openSettings() {
+  try { SET = await api("/api/settings"); renderSettings(); $("setDlg").showModal(); } catch (err) { toast(err.message, true); }
+}
+$("setBtn").onclick = openSettings;
+$("setClose").onclick = () => $("setDlg").close();
+$("setDownload").onclick = () => { window.location.href = "/api/settings/file"; };
+$("setLoad").onclick = () => $("setFile").click();
+$("setFile").onchange = async e => {
+  const f = e.target.files[0]; e.target.value = "";
+  if (!f) return;
+  if (!confirm(`Import settings from ${f.name}? Current settings are kept as a backup. Unedited images will be re-analysed.`)) return;
+  try {
+    const r = await fetch("/api/settings/load", {method: "POST", body: f, headers: {"Content-Type": "application/octet-stream"}});
+    const d = await r.json().catch(() => ({error: `HTTP ${r.status}`}));
+    if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+    settingsJob("Settings imported");
+  } catch (err) { toast(err.message, true); }
+};
+function settingsJob(doneText) {
+  const poll = async () => {
+    const j = await api("/api/job");
+    if (j.state === "running") { $("setStatus").textContent = `Re-analysing images: ${j.done} of ${j.total}`; return setTimeout(poll, 700); }
+    if (j.state === "error") { toast(j.message, true); SET = await api("/api/settings"); return renderSettings(); }
+    toast(`${doneText}. ${j.result ? j.result.reanalysed : 0} images re-analysed.`);
+    SET = await api("/api/settings"); renderSettings(); await loadList(); if (S.id !== null) openImage(S.id, true);
+  };
+  poll();
+}
+$("setReset").onclick = async () => {
+  if (!confirm("Reset to standard settings? Current settings are kept as a backup. Unedited images will be re-analysed.")) return;
+  try { await post("/api/settings/reset"); $("setStatus").textContent = "Resetting"; settingsJob("Reset to standard"); }
+  catch (err) { toast(err.message, true); }
 };
 let thrTimer = 0;
 function onThreshold(which) {

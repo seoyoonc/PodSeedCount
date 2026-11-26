@@ -20,15 +20,26 @@ Pods
   {"op": "ignore_pod", "pod": 3}  /  {"op": "restore_pod", "pod": 3}   not a pod (e.g. debris)
   {"op": "merge_pods", "pods": [3, 4]}                             one pod detected as two
   {"op": "split_pod", "pod": 3, "line": [[x, y], [x, y]]}         two touching pods detected as one
+  {"op": "flag_pod", "pod": 3, "value": "yes"}   review flag of a pod set by hand ("no" | "maybe" | "yes";
+                                                   null = back to the automatic flag)
+  {"op": "redraw_pod", "pod": 3, "outline": [[x, y], ...], "recount": true, "result": {...}}
+       the pod outline is wrong: replace it. Midline and cuts are rebuilt from the new outline; with
+       recount, seeds are found again inside it (seeds you added inside it are kept). "result" is the
+       automatic analysis of the drawn outline, filled in by the review server, so replaying is exact.
+       Other pods lying mostly inside the drawn outline (pieces of the same pod) stop counting ("not a pod").
+  {"op": "add_pod", "outline": [[x, y], ...], "result": {...}}    a pod the program missed
 Image
   {"op": "reviewed", "value": true}                the whole image has been checked
+  {"op": "flag", "value": "yes"}                   review flag of the image set by hand (null = automatic)
 """
 from __future__ import annotations
 
 import cv2
 import numpy as np
 
-from .model import ImageResult, Pod, Seed
+from .model import ImageResult, Pod, Seed, pod_from_dict
+
+FLAGS = (None, "no", "maybe", "yes")
 
 
 # ------------------------------------------------------------------ geometry helpers
@@ -252,6 +263,77 @@ def _split_pod(img: ImageResult, edit: dict) -> None:
     img.pods.append(new_pod)
 
 
+def _flag_value(edit: dict):
+    v = edit.get("value")
+    if v in ("", "auto"):
+        v = None
+    if v not in FLAGS:
+        raise ValueError("a review flag must be 'no', 'maybe', 'yes' or empty (automatic)")
+    return v
+
+
+def _inside(pt, outline) -> bool:
+    c = np.asarray(outline, np.float32).reshape(-1, 1, 2)
+    return cv2.pointPolygonTest(c, (float(pt[0]), float(pt[1])), False) >= 0
+
+
+def _drawn_result(edit: dict) -> Pod:
+    res = edit.get("result")
+    if not res:
+        raise ValueError("this pod edit has no analysis result; it must be made in the review page")
+    return pod_from_dict(res)
+
+
+def _adopt(img: ImageResult, pod: Pod, seeds: list) -> None:
+    """Add the automatic seeds of a drawn pod to it, each with an id unused in the image
+    (deterministic, so replaying the edit log gives the same ids)."""
+    for s in seeds:
+        s.pod = pod.index
+        s.id = img.new_seed_id(pod.index)
+        pod.seeds.append(s)
+
+
+def _absorb_covered(img: ImageResult, pod: Pod) -> None:
+    """Other pods lying mostly inside a drawn outline are pieces of the same pod: stop counting them."""
+    outline = np.asarray(pod.outline, np.float32).reshape(-1, 1, 2)
+    for other in img.pods:
+        if other is pod or other.status != "active" or len(other.outline) < 3:
+            continue
+        pts = np.asarray(other.outline, float)
+        inside = np.mean([cv2.pointPolygonTest(outline, (float(x), float(y)), True) > -5 for x, y in pts])
+        if inside >= 0.6:
+            other.status = "ignored"
+            other.warnings = sorted(set(other.warnings + [f"inside pod {pod.index} drawn by reviewer"]))
+
+
+def _redraw_pod(img: ImageResult, edit: dict) -> None:
+    pod = img.pod(int(edit["pod"]))
+    new = _drawn_result(edit)
+    if edit.get("recount", True):
+        kept = [s for s in pod.seeds if s.source == "manual" and not s.features.get("split_from")
+                and _inside(s.centroid, new.outline)]
+        pod.seeds = kept
+        _adopt(img, pod, new.seeds)
+        pod.uncovered = new.uncovered
+    for k in ("outline", "centerline", "bud_cut", "stem_cut", "body_width_px", "bud_visible", "stem_visible"):
+        setattr(pod, k, getattr(new, k))
+    for s in pod.seeds:  # the row of each seed follows the new midline
+        s.row = _row(s.centroid[0], s.centroid[1], pod.centerline)
+    pod.warnings = sorted(set([w for w in pod.warnings if "pod" not in w or "by reviewer" in w]
+                              + ["outline redrawn by reviewer"]))
+    _absorb_covered(img, pod)
+
+
+def _add_pod(img: ImageResult, edit: dict) -> None:
+    new = _drawn_result(edit)
+    new.index = 1 + max((p.index for p in img.pods), default=0)
+    seeds, new.seeds = new.seeds, []
+    new.warnings = ["drawn by reviewer"]
+    img.pods.append(new)
+    _adopt(img, new, seeds)
+    _absorb_covered(img, new)
+
+
 def apply_edit(img: ImageResult, edit: dict) -> None:
     op = edit.get("op")
     if op in ("accept", "reject", "restore", "delete"):
@@ -305,6 +387,14 @@ def apply_edit(img: ImageResult, edit: dict) -> None:
         _split_pod(img, edit)
     elif op == "reviewed":
         img.reviewed = bool(edit.get("value", True))
+    elif op == "flag":
+        img.manual_flag = _flag_value(edit)
+    elif op == "flag_pod":
+        img.pod(int(edit["pod"])).manual_flag = _flag_value(edit)
+    elif op == "redraw_pod":
+        _redraw_pod(img, edit)
+    elif op == "add_pod":
+        _add_pod(img, edit)
     else:
         raise ValueError(f"unknown edit operation: {op}")
 

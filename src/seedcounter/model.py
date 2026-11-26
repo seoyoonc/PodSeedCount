@@ -46,6 +46,7 @@ class Pod:
     warnings: list = field(default_factory=list)
     seeds: list = field(default_factory=list)       # list[Seed]
     status: str = "active"               # "active" | "ignored" (not a pod, set by a reviewer)
+    manual_flag: Optional[str] = None    # None (automatic) | "no" | "maybe" | "yes": review flag set by a reviewer
 
     @property
     def bud_x(self) -> float:
@@ -77,6 +78,7 @@ class ImageResult:
     error: Optional[str] = None                     # set when the image could not be processed
     annotated_image: Optional[str] = None           # relative path of the PNG
     reviewed: bool = False                          # a person has checked the whole image
+    manual_flag: Optional[str] = None               # None (automatic) | "no" | "maybe" | "yes": set by a reviewer
 
     def find_seed(self, seed_id: str):
         for pod in self.pods:

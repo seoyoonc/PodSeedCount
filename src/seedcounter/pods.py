@@ -269,6 +269,51 @@ def _columns(mask: np.ndarray, y_off: int, x_off: int):
     return x0 + x_off, x1 + x_off, top + y_off, bot + y_off
 
 
+def geom_from_crop(m: np.ndarray, bbox: tuple, shape: tuple, cfg: dict, seed_radius: float) -> PodGeom:
+    """Geometry of one pod from its mask (bbox crop): outline, width, midline, bud and stem cuts."""
+    pc = cfg["pods"]
+    y0, y1, x0, x1 = bbox
+    H, W = shape
+    px0, px1, top, bot = _columns(m, y0, x0)
+    width = ndi.median_filter(bot - top + 1, 5)
+    nn = len(width)
+    body = float(np.median(width[int(nn * 0.2):max(int(nn * 0.8), int(nn * 0.2) + 1)]))
+    win = max(5, int(0.6 * body))
+    center = ndi.uniform_filter1d((top + bot) / 2.0, win, mode="nearest")
+    wide_l = np.nonzero(width >= pc["left_body_frac"] * body)[0]
+    wide_r = np.nonzero(width >= pc["right_body_frac"] * body)[0]
+    bud_x = max(px0 + wide_l[0], px0 + pc["bud_frac"] * body)
+    stem_x = px0 + wide_r[-1]
+    g = PodGeom(0, (y0, y1, x0, x1), m, px0, px1, top, bot, center, width, body, float(bud_x), float(stem_x))
+    if px0 <= 1:
+        g.bud_visible = False
+        g.warnings.append("bud end touches the image edge")
+    if px1 >= W - 2 and width[-1] >= pc["right_body_frac"] * body:
+        g.stem_visible = False
+        g.warnings.append("stem end is outside the image")
+    tilt = np.degrees(np.arctan(np.polyfit(np.arange(nn), center, 1)[0])) if nn > 1 else 0.0
+    if abs(tilt) > pc["max_tilt_deg"]:
+        g.warnings.append(f"pod tilted {tilt:.0f} degrees; results may be unreliable")
+    return g
+
+
+def geom_from_outline(outline_work, shape: tuple, cfg: dict, seed_radius: float) -> PodGeom:
+    """Geometry of a pod drawn by hand (polygon in work-scale pixels)."""
+    H, W = shape
+    pts = np.round(np.asarray(outline_work, np.float64).reshape(-1, 2)).astype(np.int32)
+    full = np.zeros((H, W), np.uint8)
+    cv2.fillPoly(full, [pts], 1)
+    if full.sum() < 20:
+        raise ValueError("the drawn pod is too small")
+    ys, xs = np.nonzero(full)
+    y0, y1 = max(int(ys.min()) - 2, 0), min(int(ys.max()) + 3, H)
+    x0, x1 = max(int(xs.min()) - 2, 0), min(int(xs.max()) + 3, W)
+    g = geom_from_crop(full[y0:y1, x0:x1] > 0, (y0, y1, x0, x1), shape, cfg, seed_radius)
+    if g.stem_x - g.bud_x < 2 * seed_radius:
+        raise ValueError("the drawn pod is too short: trace the whole pod, from the bud tip to the stem")
+    return g
+
+
 def find_pods(rgb: np.ndarray, cfg: dict, seed_radius: float) -> tuple[list[PodGeom], list[str]]:
     """Pods in a (work-scale) RGB image, sorted top to bottom."""
     pc = cfg["pods"]
@@ -290,32 +335,12 @@ def find_pods(rgb: np.ndarray, cfg: dict, seed_radius: float) -> tuple[list[PodG
         sl = slices[k - 1]
         y0, y1 = max(sl[0].start - 2, 0), min(sl[0].stop + 2, H)
         x0, x1 = max(sl[1].start - 2, 0), min(sl[1].stop + 2, W)
-        m = lab[y0:y1, x0:x1] == k
-        px0, px1, top, bot = _columns(m, y0, x0)
-        width = ndi.median_filter(bot - top + 1, 5)
-        nn = len(width)
-        body = float(np.median(width[int(nn * 0.2):max(int(nn * 0.8), int(nn * 0.2) + 1)]))
-        win = max(5, int(0.6 * body))
-        center = ndi.uniform_filter1d((top + bot) / 2.0, win, mode="nearest")
-        wide_l = np.nonzero(width >= pc["left_body_frac"] * body)[0]
-        wide_r = np.nonzero(width >= pc["right_body_frac"] * body)[0]
-        bud_x = max(px0 + wide_l[0], px0 + pc["bud_frac"] * body)
-        stem_x = px0 + wide_r[-1]
-        g = PodGeom(0, (y0, y1, x0, x1), m, px0, px1, top, bot, center, width, body, float(bud_x), float(stem_x))
-        if px0 <= 1:
-            g.bud_visible = False
-            g.warnings.append("bud end touches the image edge")
-        if px1 >= W - 2 and width[-1] >= pc["right_body_frac"] * body:
-            g.stem_visible = False
-            g.warnings.append("stem end is outside the image")
-        tilt = np.degrees(np.arctan(np.polyfit(np.arange(nn), center, 1)[0]))
-        if abs(tilt) > pc["max_tilt_deg"]:
-            g.warnings.append(f"pod tilted {tilt:.0f} degrees; results may be unreliable")
+        g = geom_from_crop(lab[y0:y1, x0:x1] == k, (y0, y1, x0, x1), (H, W), cfg, seed_radius)
         if any(np.any(lab[np.clip(p[:, 1] + d, 0, H - 1), p[:, 0]] == k) for p in seams for d in (-2, 2)):
             g.warnings.append("pod touched another pod; separated automatically along the seam")
-        if (y1 - y0) > 2.2 * body:
+        if (y1 - y0) > 2.2 * g.body_width:
             g.warnings.append("pod outline is unusually tall; pods may be touching")
-        if stem_x - bud_x < 4 * seed_radius:
+        if g.stem_x - g.bud_x < 4 * seed_radius:
             g.warnings.append("pod too short to analyse")
             continue
         geoms.append(g)

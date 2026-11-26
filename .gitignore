@@ -1,7 +1,18 @@
+# Python and tools
 .venv/
 __pycache__/
 *.pyc
 .pytest_cache/
+
 output/
 config/*.backup.yaml
+
+*.tif
+*.tiff
 input_images/
+ground_truth/raw/*
+!ground_truth/raw/.gitkeep
+ground_truth/annotations/*
+!ground_truth/annotations/.gitkeep
+ground_truth/removed/
+tests/data/

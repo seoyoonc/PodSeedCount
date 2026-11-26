@@ -1,6 +1,6 @@
 # Seed counter: user manual
 
-Version 2.6.0. Installation is described in `SETUP.md`.
+Version 2.10.1. Installation is described in `SETUP.md`.
 
 The seed counter finds the pods in transmitted-light microscope images (`.tif`), counts the seeds in each pod,
 draws a border around every seed and tells you which counts it is unsure about. In the **review page** you
@@ -23,7 +23,7 @@ Keys in this manual are the default shortcuts; they can be changed (section 16).
 10. [Finishing an image, undo and discard](#10-finishing-an-image-undo-and-discard)
 11. [The threshold sliders](#11-the-threshold-sliders)
 12. [Adding images](#12-adding-images)
-13. [Adding annotated images (ground truth)](#13-adding-annotated-images-ground-truth)
+13. [Annotated images (ground truth)](#13-annotated-images-ground-truth)
 14. [The overview](#14-the-overview)
 15. [Learning from your reviews](#15-learning-from-your-reviews)
 16. [Keyboard shortcuts and how to change them](#16-keyboard-shortcuts-and-how-to-change-them)
@@ -75,8 +75,8 @@ Example: `.venv\Scripts\python scripts\review.py D:\scans\batch3 -o D:\scans\bat
 
 ```
 +------------------------------------------------------------------------------------------------+
-| Seed review | Review threshold ---o--- | Reject threshold --o---- | Add images | Add annotation  |
-|             |                          |                          | Overview | Learn from reviews |
+| Seed review | Review threshold ---o--- | Reject threshold --o---- | Add images | Overview        |
+|             |                          |                          | Learn from reviews | Settings  |
 |             |                          |                          | Undo | Save results            |
 +-------------+------------------------------------------------------+---------------------------+
 | Image list  | Toolbar: Select | Add seed | Split seed | Redraw      | Image: name, status,      |
@@ -94,15 +94,16 @@ Example: `.venv\Scripts\python scripts\review.py D:\scans\batch3 -o D:\scans\bat
 |---|---|
 | Review threshold, Reject threshold | Sliders that decide the seed colours and pod review flags (section 11) |
 | Add images | Add TIFF files to the input folder (section 12) |
-| Add annotation | Add a raw image with its annotated copy as ground truth (section 13) |
 | Overview | All images in one table, with progress (section 14) |
 | Learn from reviews | Tune the program on the images you checked (section 15) |
+| Settings | Which counting settings are in use, whether they are the standard ones, and the settings fingerprint (section 20) |
 | Undo | Undo your last change to the current image |
-| Save results | Write the report, tables and annotated images with your corrections (section 17) |
+| Save results | Choose images, then write the report, tables and annotated images with your corrections (section 17) |
 
 **Image list (left)**: every image, with its review status as a coloured chip and a coloured left edge
 (green *no*, orange *maybe*, red *yes* or *error*), a ✓ when you have marked it as checked, and a line like
-*147 seeds, 6 pods, 3 to check, 2 edits*. Click an image to open it.
+*147 seeds, 6 pods, 3 to check, 2 edits*. A ✎ next to the chip means you set the review flag yourself
+(section 10). Click an image to open it.
 
 **Image area (centre)**: the image with all pods and seed borders. The toolbar at the top left switches drawing
 modes and layers; the zoom level is shown at the bottom left.
@@ -277,6 +278,30 @@ You can also draw the seed yourself with *Add seed*; an area covered by a seed n
 
 Click an **empty part of a pod** (or its row in the Pods table) to select the pod. The Selection card then offers:
 
+### Review flag (pod)
+
+Sets this pod's review flag by hand: *no*, *maybe* or *yes*, or *automatic* to go back to the program's flag. Your
+flag always wins and is marked with ✎ in the Pods table and *flag set by reviewer* in the report. The image's
+automatic flag follows its pods, so flagging a pod *yes* also makes the image *yes* unless you flagged the image.
+
+### Redraw outline
+
+For a pod whose outline is wrong: for example its pale bud half was missed, it was broken into pieces, or it
+includes a neighbour. Click *Redraw outline*, then trace the correct outline **in one stroke**, from the bud tip
+round the whole pod; releasing the mouse closes it. The program then rebuilds the midline and the bud and stem cuts
+from your outline and, with **find seeds again** ticked (default), finds the seeds inside it exactly as it would
+for an automatically found pod. Seeds you added inside the new outline are kept; your other decisions on this pod's
+seeds are replaced, so redraw the pod first and check its seeds afterwards. Untick *find seeds again* to keep the
+current seeds and only rebuild the midline and cuts.
+
+Other pods lying mostly inside your new outline (pieces of the same pod) stop counting automatically; they are
+drawn dashed grey, like *Not a pod*. Undo (Ctrl+Z) reverses the whole step.
+
+### Draw pod (toolbar)
+
+For a pod the program missed completely: click **Draw pod** in the toolbar and trace the pod's outline in one stroke.
+It becomes a new pod (next free number) with its own midline, cuts and seeds. Pieces inside it stop counting, as above.
+
 ### Move bud cut / Move stem cut
 
 Click *Move bud cut* (or *Move stem cut*), then click inside the pod where the cut belongs. Seeds left of the bud
@@ -308,6 +333,8 @@ outline, has no number and is not counted. Select it and click *Count this pod a
 | **Ctrl+Z**, *Undo* | Undoes your last change to this image; repeat to go further back. Each image has its own history, which survives restarts. |
 | **U** | Undoes the decision on the selected item only (accept, reject, redraw, split, dismiss) |
 | *Discard edits* | Removes **all** your changes to this image and analyses it again with the current settings (you are asked to confirm) |
+| *Review flag* | Sets the whole image's review flag by hand (*no*, *maybe*, *yes*), or *automatic*. Use it when the program is clearly wrong about an image, e.g. it is marked *no* but the pods are badly found. Your flag wins over the automatic one and over *checked*; the list shows ✎, and the tables have a *flag_source* column (*automatic* or *reviewer*). |
+| *Remove from list* | Takes the image out of the review. The TIFF and your edits are **moved** (not deleted) to `output\review\removed\`, and the image is no longer used by *Save results* or *Learn from reviews*. Useful for a test image. To bring it back, open *Add images*: removed images are listed there with a *Restore* button, and come back with all their edits. |
 
 ## 11. The threshold sliders
 
@@ -342,51 +369,22 @@ The two sliders at the top decide the colours and flags; they do not change the 
 The files are copied into the input folder (`input_images\` unless you started the review with another folder),
 so they are also there for the next start and for `run_count.py`.
 
-## 13. Adding annotated images (ground truth)
+## 13. Annotated images (ground truth)
 
-Annotated images are images in which a person has outlined every seed. The program uses them to check itself and
-to learn (section 15).
+Earlier versions had an *Add annotation* button for images in which a person had outlined every seed by hand. It
+was removed in version 2.9: checking images in the review and using *Learn from reviews* (section 15) gives the
+program the same kind of information with much less work.
 
-### Preparing an annotation
+The two are close, but not identical:
 
-- Use a copy of the **full, uncropped** image. Any size is fine (it is scaled back), but the proportions must be
-  the same as the TIFF.
-- Draw a **closed white outline** around each seed. Gaps in a line make the shape "open", and an open shape is
-  not counted.
-- Numbers, other lines and the blue stem bar may stay on the image; they are ignored. Handwritten counts on the
-  image are **not** read: you type the counts in the dialog.
-- Save as PNG if you can. JPEG works, but blurs thin lines.
+- A **checked image** is the program's result after your corrections. Seeds you did not touch count as correct, so
+  its quality depends on how carefully you checked it, and seed shapes are learned only from borders you redrew.
+- A **hand annotation** is made without the program, so it cannot inherit the program's mistakes, and every seed
+  has a hand-drawn outline.
 
-### Adding it
-
-1. Click **Add annotation**.
-2. Choose the **raw image** (the original `.tif`) and the **annotated image**, then click **Check**.
-3. The dialog shows a preview: the raw image with the recognised outlines in **magenta** and each pod numbered.
-   Click the preview to open it larger in a new tab.
-4. The table lists every pod with the number of enclosed **shapes** found. Type the **seed count** of each pod
-   (from your annotation, top to bottom as numbered in the preview).
-5. Each row shows whether shapes and count agree:
-
-| Shown | Meaning | Usual cause |
-|---|---|---|
-| ✓ match | The number of outlined shapes equals your count | |
-| *2 fewer* | Fewer shapes than your count | An outline is not closed, or a seed has no outline |
-| *2 more* | More shapes than your count | A gap enclosed between touching outlines was taken as a shape |
-
-   The total number of shapes, and any shapes outside all pods, are shown above the table.
-6. Fix the annotation and check again, or click **Save annotation**. If some pods differ you are asked to confirm;
-   your typed counts are then the truth, and the outlines are still used to match individual seeds.
-
-Saving copies the raw image to `ground_truth\raw\` and the annotation to `ground_truth\annotations\` (renamed
-to `<image name>_annotation.<ext>`), and adds an entry to `ground_truth\manifest.yaml`.
-
-### Existing annotations
-
-The bottom of the dialog lists the annotations in the ground-truth folder. **Remove** takes one out of the
-manifest and moves its files to `ground_truth\removed\` (nothing is deleted). An image that is already annotated
-must be removed before it can be added again.
-
-If the two files have different proportions, the check stops with a message: annotate the full, uncropped frame.
+For counts, a carefully checked image is as good as a hand annotation. Annotations that are already in
+`ground_truth\` are still used by *Learn from reviews* (an option appears in its dialog when there are any), and
+new ones can still be added by hand (section 21).
 
 ## 14. The overview
 
@@ -429,8 +427,8 @@ you explicitly redrew do. Seeds you did not touch on a checked image count as co
    want the borders to improve.
 2. Click **Learn from reviews**.
 3. Choose:
-   - *Also use the annotated images in ground_truth/*: include your annotations (section 13). If an image is both
-     annotated and checked, the checked version is used.
+   - *Also use the hand-annotated images in ground_truth/*: shown only if there are any (section 13). If an image
+     is both annotated and checked, the checked version is used.
    - *Also tune the detection settings*: tries many combinations of the detection settings (a few minutes for a
      handful of images; longer for many). Untick it to only re-fit the confidence colours (seconds).
 4. Click **Start**. When it is done, the dialog compares the current and the new settings:
@@ -510,8 +508,11 @@ the shortcuts actually in effect.
 holding the analysis you reviewed and the list of your changes). You can close the browser or stop the program at
 any time; start it again to continue exactly where you were, including the undo history.
 
-**Save results** writes the normal output files (section 18) into the output folder, with all corrections and the
-current slider positions:
+**Save results** first asks which images to include: tick them, or use *All*, *Checked*, *Not checked* or *None*.
+The first time, the checked images are selected (or all, if none is checked yet); afterwards your last choice is
+remembered. It then writes the normal output files (section 18) into the output folder for those images only, with
+all corrections, review flags and the current slider positions. The report and tables list only the selected
+images; annotated PNGs that an earlier save wrote for other images stay in the folder.
 
 - annotated images with the corrected borders and counts,
 - the tables with corrected counts, the automatic counts and changes, a *reviewed* column, and the edits per pod
@@ -593,8 +594,64 @@ Every script explains its options with `--help`.
 
 ## 20. Changing settings
 
-All settings, each with an explanation, are in `config\default.yaml`. Ways to change them:
+### What "standard settings" means
 
+Each program version comes with **standard settings**: the values in `config\default.yaml` when you install it (a
+copy is kept inside the program, so the review page can compare). For version 2.8 and later they were tuned on the
+hand-counted example images (section 23). The settings **in use** are whatever `config\default.yaml` holds now.
+They differ from the standard ones only if *Learn from reviews* (*Use the new settings*) or a person changed the file.
+
+**Settings** in the review page shows:
+
+- whether the standard settings are in use, or which ones differ;
+- the settings by topic (Pods, Counted area, Seed size, Seeds, Colours and flags, Learning, Output, Input). Each
+  topic shows its main settings; the rest are under *Advanced*. Topics with changes are opened and marked;
+- *Export settings* / *Import settings*: take your settings to another computer (below);
+- the **settings fingerprint**: a 12-character code computed from every setting that affects the counts (and the
+  analysis version). It is also printed in every report, in `results.json` and by `run_count.py`;
+- *All settings*, each with what it does;
+- *Backup file*: when `config\default.yaml` was last replaced (by *Use the new settings* or *Reset*), the old file
+  was kept as `config\default.backup.yaml`. Nothing reads the backup; it is only there to go back by hand. After a
+  program update its differences may simply be the changes between versions.
+
+*Reset to standard* writes the standard settings into `config\default.yaml` (the current file becomes the
+backup) and analyses images without edits again.
+
+Settings are deliberately not edited in the page: a setting changed by eye to fix one image often makes other images
+worse. The reliable way is to check more images and let *Learn from reviews* test changes on all of them.
+
+### Running the program on another computer
+
+Counting depends only on the **program version** and the **settings file** `config\default.yaml`. Nothing else
+affects it (the slider positions are not saved, and keyboard shortcuts do not affect counting).
+
+- **Images and results never travel with the program.** `input_images\`, `output\` (reports and review work),
+  the image files in `ground_truth\` and any `.tif` file are excluded from git (`.gitignore`), so they are never
+  committed or pushed. A fresh copy on another computer starts with an empty image list.
+- **The settings file does travel**, because it is part of the program folder: it is committed with the program.
+
+Two ways to set up the other computer (installation itself: `SETUP.md`, section 10):
+
+1. **With GitHub**: on this computer, commit and push (images are excluded automatically); on the other computer,
+   clone the repository. If you changed settings with *Learn from reviews*, they are in `config\default.yaml` and
+   come along as long as you committed that file.
+2. **Without GitHub**: install the program from the zip, then in *Settings* on this computer click
+   **Export settings**, and on the other computer **Import settings** and choose that file.
+
+Check: the settings fingerprint (in *Settings* or in any report) must be the same on both computers. Then both count
+identically. The fingerprint includes the version of the counting method, so it stays the same across program
+updates that only changed the page (versions 2.8 to 2.10 all give `917b706d6e0e` with the standard settings).
+
+To continue a review on the other computer, copy `output\review\` and the images too (by hand; they are not in git).
+
+**Where the backup goes.** Whenever the settings file is replaced (Learn from reviews, Import, Reset), the old one is
+kept as `default.backup.yaml` next to it, in the `config\` folder of the program folder on **that** computer.
+Nothing is fixed to one computer: every path is worked out from where the program folder is. The backup is excluded
+from git, so each computer keeps its own.
+
+### Changing settings by hand
+
+All settings, each with an explanation, are in `config\default.yaml`. Ways to change them:
 1. Edit `config\default.yaml` in a text editor.
 2. Make a file with only the settings you change and use it with `-c my_settings.yaml` (review and scripts).
 3. Override for one run of a script: `--set section.key=value` (repeatable).
@@ -614,10 +671,11 @@ Most useful settings:
 
 ## 21. Adding ground truth by hand
 
-The easiest way is *Add annotation* (section 13). Without the page:
+Hand annotations are optional (section 13). To add one:
 
 1. Copy the raw TIFF into `ground_truth\raw\`.
-2. Put the annotated copy (section 13, *Preparing an annotation*) into `ground_truth\annotations\`.
+2. Put the annotated copy into `ground_truth\annotations\`: a copy of the full, uncropped image with a closed
+   white outline drawn around every seed (PNG preferred).
 3. Fill in the empty entry in `ground_truth\manifest.yaml` (or add a new one below it for each further image),
    with your counts per pod from top to bottom:
 
@@ -687,6 +745,31 @@ Version 2.5 was developed on `07_1827px6_08` (six pods, two pairs touching; tune
 | 2.4 | 4 pods found: 38, 55, 48, 23 | 29, 23, 28, 19, 23, 22 | 164 vs 144 | pods merged |
 | 2.4 + pod separation | 38, 24, 32, 22, 29, 23 | 29, 23, 28, 19, 23, 22 | 168 vs 144 | 24 seeds |
 | 2.5 | 30, 23, 28, 21, 23, 22 | 29, 23, 28, 19, 23, 22 | 147 vs 144 | 3 seeds (2.1 %) |
+
+Version 2.7 was tuned on `1-1_0001` (four dense pods with packed rows; tuned on this image, so optimistic). In
+packed rows the lighter ring a seed template expects is filled by the neighbouring seeds, so seeds there were not
+found and showed as magenta "dark area without seed". A stronger, tighter ring and less smoothing of seed centres
+(`surround_weight` 0.6 -> 0.8, `surround` 1.45 -> 1.3, `peak_sigma` 0.15 -> 0.1) fixed this:
+
+| Version | Program, per pod | Hand count, per pod | Total | Per-pod error |
+|---|---|---|---|---|
+| 2.6 | 53, 50, 47, 47 | 55, 56, 51, 48 | 197 vs 210 | 13 seeds (6.2 %) |
+| 2.7 | 55, 55, 50, 48 | 55, 56, 51, 48 | 208 vs 210 | 2 seeds (1.0 %) |
+
+The same change left the counts of `11_1831px5_05` and `08_1828px6_01` (sparser pods) exactly unchanged.
+
+Version 2.7.1: since 2.6 the pod outline includes the pale wall, so pods measure about 7 % wider and the stem cut had
+moved towards the stem, letting a few dark spots in the stem neck count as seeds. The stem cut now sits where the
+width drops below 65 % (was 60 %). All three hand-counted images, version 2.7.1:
+
+| Image | Program, per pod | Hand count, per pod | Per-pod error | Tuned on it? |
+|---|---|---|---|---|
+| `07_1827px6_08` | 29, 23, 28, 22, 23, 22 | 29, 23, 28, 19, 23, 22 | 3 seeds over 6 pods | 2.5 yes |
+| `Col_0002` | 57, 54, 61, 47, 45 | 58, 54, 62, 48, 46 | 4 seeds over 5 pods | no |
+| `1-1_0001` | 55, 55, 49, 48 | 55, 56, 51, 48 | 3 seeds over 4 pods | 2.7 yes |
+
+10 seeds over 15 pods, 0.67 per pod. Each image has at least one tuning step that did not see it, but none is fully
+independent; re-check on new hand-counted images.
 Expect larger errors on new kinds of images until some of them are checked and the program has learned from them.
 
 **Limitations**

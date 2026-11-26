@@ -1,0 +1,109 @@
+# Seed counter settings. All values can be overridden per run on the command line
+# (see MANUAL.md, section 20). Lengths marked "seed radii" scale with the seed size.
+
+input:
+  extensions: [".tif", ".tiff"]
+  recursive: false              # also look in sub-folders of the input directory
+
+processing:
+  work_scale: 0.5               # images are analysed at this fraction of full size (speed)
+  seed_radius_px: 26            # expected seed radius at full resolution, in pixels
+  auto_radius: true             # re-estimate the seed size per image if it differs a lot
+  auto_radius_tolerance: 0.30   # re-run only if the estimate differs by more than 30 %
+
+pods:
+  method: colour                # colour = colour distance from the background + edges; saturation = earlier method
+  colour_threshold: 2.0         # colour: pod = at least this far from the background colour (Lab Delta E) ...
+  noise_factor: 5.0             # ... and at least this many times the background noise
+  strong_factor: 3.0            # each pod must contain colour at least this many times the threshold
+  close_length: 0.02            # length of the gap-closing step along the pod, as a fraction of image width
+  colour_blur: 1.5              # smoothing before measuring colour, in work pixels
+  saturation_margin: 30         # saturation method only: pod = this much more saturated than the background
+  min_area_frac: 0.2            # ignore objects smaller than 20 % of the largest pod
+  left_body_frac: 0.6           # bud end: seeds start where the pod reaches 60 % of its width
+  right_body_frac: 0.65         # stem end: pod ends where its width drops below 65 % (pods include the pale wall)
+  bud_frac: 0.5                 # never look for seeds within 0.5 pod widths of the bud tip
+  end_margin: 1.0               # extra margin at both ends, in seed radii
+  rim_frac: 0.03                # margin inside the pod wall, as a fraction of pod width
+  max_tilt_deg: 25              # warn if a pod is tilted more than this
+  split_touching: true          # separate pods that touch or overlap (no gap between them)
+  touch_height: 1.4             # a column this many pod widths tall holds two touching pods
+  touch_stop_height: 1.2        # follow the seam while the fused column is still this tall
+  touch_smoothness: 0.2         # how straight the seam between touching pods is kept
+
+contrast:
+  channel: green                # green = green channel (default); saturation = HSV saturation (stronger seeds, noisier wall)
+  pre_blur: 1.5                  # Gaussian blur before contrast (pixels at work scale)
+  background_size: 3.0          # size of the pod-background estimate, in seed radii
+
+segmentation:
+  method: ellipse               # ellipse = elliptical shape filter; contrast = earlier darkest-point method
+  ellipse:                      # elliptical shape filter (method: ellipse)
+    scales: [0.95, 1.1, 1.25]   # seed sizes tried, relative to the expected seed radius
+    aspects: [0.6, 0.7, 0.8]    # short / long axis ratios tried
+    angles: 8                   # orientations tried (over 180 degrees)
+    max_angle_to_pod: 30        # long axis at most this many degrees from the pod axis (90 = any)
+    surround: 1.3               # outer edge of the lighter ring around a seed, in ellipse radii
+    surround_weight: 0.8        # how much a dark ring counts against a match
+    min_response: 0.02          # absolute minimum match strength
+    relative_response: 0.3      # ... and at least this share of the pod's strong matches
+    min_level: 0.06             # minimum darkness in the seed's core
+    relative_level: 0.5         # ... and at least this share of the pod's typical seed darkness
+    fill: 0.55                  # share of the ellipse that must be at least half as dark as its core
+    core: 0.75                  # core = inner part of the ellipse (in ellipse radii) ...
+    max_overlap: 0.3            # ... a candidate whose core is this much taken is the same seed
+  peak_sigma: 0.1               # smoothing for seed centres, in seed radii
+  dog_sigma: 1.0                # background scale for local contrast, in seed radii
+  min_distance: 0.35            # peak search spacing, in seed radii (ellipse: overlap decides, not this)
+  peak_contrast: 0.02           # minimum local contrast of a seed centre
+  seed_threshold: 0.2           # minimum relative darkness of seed pixels
+  min_area: 0.3                 # smallest seed, as a fraction of the expected seed area
+  # contrast method only:
+  split_area: 1.3               # objects larger than this (x expected area) ...
+  split_side: 0.35              # ... with this share on both sides of the centerline are split
+  split_offset: 0.3             # ... if each side has its own dark centre this far from the line, in seed radii
+  split_dip: 0.05               # ... and the gap between the two centres is this much lighter
+  split_area_large: 2.2         # objects this large are split across the centerline even without a second centre
+
+confidence:
+  review_threshold: 0.70        # >= this: green seed / pod "no"
+  reject_threshold: 0.40        # <  this: red seed / pod "yes"; in between: orange / "maybe"
+  # Seed confidence = logistic model over the features below (fitted by scripts/calibrate.py)
+  seed_model:
+    intercept: 2.7184
+    contrast: 2.7462                # relative darkness of the seed vs. typical seeds in the image
+    size_deviation: -1.0615         # |log(area / expected area)|
+    solidity_deficit: -10.1441      # 1 - solidity (irregular outlines)
+    centerline_cross: -9.7378       # share of the seed on the other side of the centerline
+    split: -2.6435                  # seed created by splitting a merged object
+    end_proximity: -9.5702          # closeness to the bud / stem cut
+  # Pod confidence = 1 - estimated relative count error / error_tolerance
+  pod_error_tolerance: 0.25
+  uncovered_weight: 0.8         # how much an unexplained seed-sized dark area counts as a missed seed
+  missing_end_penalty: 2.0      # seeds' worth of uncertainty when the bud or stem is outside the image
+
+render:
+  scale: 1.0                    # size of the annotated PNG relative to the original image
+  line_width: 3
+  thumbnail_width: 900          # thumbnail embedded in report.html
+
+output:
+  report_html: true
+  run_summary_csv: true
+  pods_csv: true
+  report_outline_csv: true
+  annotated_png: true
+  seeds_csv: false              # optional per-seed table
+  results_json: run             # run = run settings + summary only; full = every pod and seed; off = none
+
+calibration:                    # used by scripts/calibrate.py
+  sweep:
+    segmentation.peak_sigma: [0.1, 0.15, 0.2]
+    segmentation.ellipse.relative_response: [0.2, 0.3, 0.4]
+    segmentation.ellipse.max_overlap: [0.2, 0.3, 0.4]
+    contrast.pre_blur: [1.0, 1.5, 2.0]
+  count_weight: 1.0             # score = count_weight * per-pod count error - f1_weight * seed F1
+  f1_weight: 60.0               #         - border_weight * border overlap (when redrawn borders exist)
+  border_weight: 40.0
+  border_sources: [redrawn]     # which borders teach border shape: redrawn (in the review);
+                                # add "annotations" to also use the hand-drawn outlines in ground_truth/

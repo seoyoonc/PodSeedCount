@@ -3,6 +3,7 @@
 Files (inside the output folder):
   review/cache/<image>.json     automatic result, reused while the image and settings are unchanged
   review/sessions/<image>.json  the analysis the reviewer worked on ("base") + the edit log
+  review/removed/<image>/       images taken out of the list: the TIFF, its review file and its cache
 Results shown and exported are always base + edits replayed, so undo is simply "drop the last edit".
 """
 from __future__ import annotations
@@ -12,6 +13,7 @@ import datetime as dt
 import hashlib
 import json
 import logging
+import shutil
 import threading
 from pathlib import Path
 
@@ -31,10 +33,8 @@ ANALYSIS_KEYS = ("processing", "pods", "contrast", "segmentation")
 
 def analysis_hash(cfg: dict) -> str:
     """Changes only when settings that affect the automatic analysis change (not thresholds)."""
-    part = {k: cfg[k] for k in ANALYSIS_KEYS}
-    part["seed_model"] = cfg["confidence"]["seed_model"]
-    part["version"] = ANALYSIS_VERSION
-    return hashlib.sha1(json.dumps(part, sort_keys=True, default=str).encode()).hexdigest()[:12]
+    from ..settings_info import fingerprint
+    return fingerprint(cfg)
 
 
 def _safe(key: str) -> str:
@@ -172,7 +172,28 @@ class ReviewSession:
                            "edits": self.edits[key], "base": to_dict(self.base[key])})
 
     # ------------------------------------------------------------ changes
+    def _with_pod_analysis(self, key: str, edit: dict) -> dict:
+        """A drawn pod outline needs the automatic analysis inside it; it is stored in the edit."""
+        from ..pipeline import analyse_drawn_pod
+        img = self.current[key]
+        outline = edit.get("outline") or []
+        if len(outline) < 8:
+            raise ValueError("trace the pod outline all the way round in one stroke")
+        target = int(edit["pod"]) if edit["op"] == "redraw_pod" else None
+        if target is not None:
+            img.pod(target)            # KeyError if the pod does not exist
+        darks = [s.features["darkness"] for p in img.pods if p.index != target for s in p.seeds
+                 if s.source == "auto" and "darkness" in s.features and not s.features.get("split")]
+        ref = float(sorted(darks)[len(darks) // 2]) if darks else None
+        pod = analyse_drawn_pod(load_image(self.paths[key]), self.cfg, img.seed_radius_px, outline,
+                                index=target or 0, ref_darkness=ref)
+        out = dict(edit)
+        out["result"] = to_dict(pod)
+        return out
+
     def apply(self, key: str, edit: dict) -> None:
+        if edit.get("op") in ("redraw_pod", "add_pod") and not edit.get("result"):
+            edit = self._with_pod_analysis(key, edit)
         with self.lock:
             trial = copy.deepcopy(self.current[key])
             apply_edits(trial, [edit])          # raises ValueError / KeyError for invalid edits
@@ -214,6 +235,7 @@ class ReviewSession:
             img = self.current[key]
             s = image_summary(img, cfg)
             out.append({"id": i, "key": key, "seeds": s["seeds"], "pods": s["pods"], "needs_review": s["needs_review"],
+                        "auto_needs_review": s["auto_needs_review"], "manual_flag": img.manual_flag,
                         "reviewed": img.reviewed, "edits": len(self.edits[key]), "auto_seeds": s["auto_seeds"],
                         "change": s["change"], "abs_change": s["abs_change"], "green": s["green"],
                         "orange": s["orange"], "red": s["red"], "pods_flagged": s["pods_maybe"] + s["pods_yes"],
@@ -245,6 +267,7 @@ class ReviewSession:
             counted = {id(sd) for sd in pod.active_seeds()}
             pods.append({
                 "index": pod.index, "status": pod.status, "outline": pod.outline, "centerline": pod.centerline,
+                "manual_flag": pod.manual_flag,
                 "bud_cut": pod.bud_cut, "stem_cut": pod.stem_cut,
                 "summary": pod_summary(pod, cfg, img.seed_radius_px, img.reviewed) if pod.status == "active" else None,
                 "uncovered": [{"area": j, "contour": u["contour"], "area_px": u["area_px"],
@@ -256,6 +279,7 @@ class ReviewSession:
                            "area_px": sd.area_px, "features": sd.features} for sd in pod.seeds],
             })
         return {"id": i, "key": key, "width": img.width, "height": img.height, "reviewed": img.reviewed,
+                "manual_flag": img.manual_flag,
                 "error": img.error, "notes": notes, "edits": len(self.edits[key]),
                 "summary": {k: v for k, v in s.items() if k != "pod_rows"}, "pods": pods,
                 "thresholds": {"review": cfg["confidence"]["review_threshold"],
@@ -341,17 +365,179 @@ class ReviewSession:
             return {"applied": len(changes), "backup": str(backup), "reanalysed": len(redo)}
         return self._run_job("apply", fn)
 
-    def export(self, cfg: dict) -> dict:
-        """Write the normal outputs (PNG, CSV, HTML, JSON) with all edits applied."""
+    def export(self, cfg: dict, keys=None) -> dict:
+        """Write the normal outputs (PNG, CSV, HTML, JSON) with all edits applied.
+
+        keys: the images to include (default: all). The report and tables then list only these;
+        annotated PNGs of other images that an earlier save wrote are left in place."""
         if not self.keys:
             raise ValueError("there are no images yet: add images first")
+        if keys is None:
+            keys = list(self.keys)
+        unknown = [k for k in keys if k not in self.paths]
+        if unknown:
+            raise ValueError(f"not in the image list: {', '.join(unknown[:3])}")
+        if not keys:
+            raise ValueError("select at least one image to save")
+        keys = [k for k in self.keys if k in set(keys)]   # list order
         with self.lock:
-            images = [copy.deepcopy(self.current[k]) for k in self.keys]
-        for k, img in zip(self.keys, images):
+            images = [copy.deepcopy(self.current[k]) for k in keys]
+        for k, img in zip(keys, images):
             img.path = str(self.paths[k])
         run = RunResult(date=dt.datetime.now().isoformat(timespec="seconds"), version=__version__,
                         config_file=self.config_file, config=cfg, input_dir=str(self.input_dir), images=images)
         sums = write_outputs(run, self.output_dir, cfg)
-        return {"images": len(sums), "reviewed": sum(s["reviewed"] == "yes" for s in sums),
+        return {"images": len(sums), "of": len(self.keys), "reviewed": sum(s["reviewed"] == "yes" for s in sums),
                 "need_review": sum(s["needs_review"] != "no" for s in sums),
                 "report": str(self.output_dir / "report.html")}
+
+    # ------------------------------------------------------------ removing images from the list
+    @property
+    def removed_dir(self) -> Path:
+        return self.output_dir / "review" / "removed"
+
+    def remove(self, key: str) -> dict:
+        """Take an image out of the review: its TIFF, review file and cache move to review/removed/<image>/.
+
+        Nothing is deleted. A removed image no longer counts in 'Save results' or 'Learn from reviews'."""
+        with self.lock:
+            if self.job.get("state") == "running":
+                raise ValueError("wait until the running task has finished")
+            if key not in self.paths:
+                raise KeyError(f"no image {key}")
+            box = self.removed_dir / _safe(key)
+            if box.exists():
+                shutil.rmtree(box)   # an older removal of the same name: replaced by this one
+            box.mkdir(parents=True)
+            src = self.paths[key]
+            shutil.move(str(src), str(box / src.name))
+            for d in (self.session_dir, self.cache_dir):
+                f = d / (_safe(key) + ".json")
+                if f.exists():
+                    shutil.move(str(f), str(box / (d.name + ".json")))
+            _write_json(box / "removed.json", {"key": key, "file": src.name, "original_path": str(src),
+                                               "removed": dt.datetime.now().isoformat(timespec="seconds"),
+                                               "edits": len(self.edits.get(key, []))})
+            self.keys.remove(key)
+            for d in (self.paths, self.base, self.edits, self.base_hash, self.current, self._jpeg):
+                d.pop(key, None)
+        return {"removed": key, "moved_to": str(box)}
+
+    def removed(self) -> list[dict]:
+        out = []
+        if self.removed_dir.exists():
+            for box in sorted(self.removed_dir.iterdir()):
+                meta = box / "removed.json"
+                if meta.exists():
+                    try:
+                        d = json.loads(meta.read_text(encoding="utf-8"))
+                        out.append({"key": d["key"], "removed": d.get("removed", ""), "edits": d.get("edits", 0),
+                                    "in_list": d["key"] in self.paths})
+                    except Exception:
+                        continue
+        return out
+
+    def restore(self, key: str) -> dict:
+        """Put a removed image back into the input folder and the list, with its review."""
+        with self.lock:
+            box = self.removed_dir / _safe(key)
+            meta = box / "removed.json"
+            if not meta.exists():
+                raise KeyError(f"{key} is not among the removed images")
+            if key in self.paths:
+                raise ValueError(f"{key} is already in the list")
+            d = json.loads(meta.read_text(encoding="utf-8"))
+            target = self.input_dir / key
+            if target.exists():
+                raise ValueError(f"{target.name} is already in the input folder")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(box / d["file"]), str(target))
+            for d_ in (self.session_dir, self.cache_dir):
+                f = box / (d_.name + ".json")
+                if f.exists():
+                    shutil.move(str(f), str(d_ / (_safe(key) + ".json")))
+            shutil.rmtree(box, ignore_errors=True)
+            self.paths[key] = target
+        self._load(key)
+        with self.lock:
+            self.keys.append(key)
+        return {"restored": key}
+
+    # ------------------------------------------------------------ settings overview
+    def settings_report(self) -> dict:
+        from ..settings_info import compare, plain_groups
+        rep = compare(self.cfg, self.config_file)
+        rep["groups"] = plain_groups(self.cfg)
+        return rep
+
+    def settings_file(self) -> bytes:
+        if not self.config_file or not Path(self.config_file).exists():
+            raise ValueError("the settings file is unknown")
+        return Path(self.config_file).read_bytes()
+
+    def start_load_settings(self, data: bytes) -> dict:
+        """Use a settings file from elsewhere (e.g. another computer): checked first, the current file is
+        kept as a backup, then images without edits are analysed again."""
+        import tempfile
+        import yaml
+        from ..config import load_config
+        from ..settings_info import flatten, shipped_config
+        if not self.config_file or not Path(self.config_file).exists():
+            raise ValueError("the settings file is unknown")
+        try:
+            text = data.decode("utf-8-sig")
+            loaded = yaml.safe_load(text)
+        except Exception as exc:
+            raise ValueError(f"this is not a readable settings file ({exc})")
+        if not isinstance(loaded, dict) or "pods" not in loaded:
+            raise ValueError("this is not a seed counter settings file (default.yaml)")
+        unknown = sorted(set(flatten(loaded)) - set(flatten(shipped_config())))
+        unknown = [k for k in unknown if not k.startswith("calibration.sweep.")]
+        if unknown:
+            raise ValueError(f"unknown settings in the file (from another program version?): {', '.join(unknown[:5])}")
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False, encoding="utf-8") as tmp:
+            tmp.write(text)
+        try:
+            load_config(tmp.name)          # raises ValueError for impossible values
+        finally:
+            Path(tmp.name).unlink(missing_ok=True)
+
+        def fn(progress):
+            path = Path(self.config_file)
+            backup = path.with_suffix(".backup.yaml")
+            shutil.copy(path, backup)
+            path.write_text(text, encoding="utf-8")
+            cfg = load_config(self.config_file)
+            with self.lock:
+                self.cfg, self.hash = cfg, analysis_hash(cfg)
+            self.job["message"] = "analysing unedited images with the loaded settings"
+            redo = [k for k in self.keys if not self.edits[k]]
+            for k in progress(redo):
+                res = self._auto_result(k)
+                with self.lock:
+                    if not self.edits[k]:
+                        self.base[k], self.base_hash[k], self.current[k] = res, self.hash, copy.deepcopy(res)
+            return {"backup": str(backup), "reanalysed": len(redo)}
+        return self._run_job("load_settings", fn)
+
+    def start_reset_settings(self) -> dict:
+        """Write the shipped settings into the settings file (backup kept) and re-analyse unedited images."""
+        from ..settings_info import reset_to_shipped
+        from ..config import load_config
+        if not self.config_file or not Path(self.config_file).exists():
+            raise ValueError("the settings file is unknown")
+
+        def fn(progress):
+            backup = reset_to_shipped(self.config_file)
+            cfg = load_config(self.config_file)
+            with self.lock:
+                self.cfg, self.hash = cfg, analysis_hash(cfg)
+            self.job["message"] = "analysing unedited images with the shipped settings"
+            redo = [k for k in self.keys if not self.edits[k]]
+            for k in progress(redo):
+                res = self._auto_result(k)
+                with self.lock:
+                    if not self.edits[k]:
+                        self.base[k], self.base_hash[k], self.current[k] = res, self.hash, copy.deepcopy(res)
+            return {"backup": str(backup), "reanalysed": len(redo)}
+        return self._run_job("reset", fn)

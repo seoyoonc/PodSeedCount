@@ -1,6 +1,6 @@
 # Seed counter: setup guide
 
-Version 2.6.0. This guide installs the program. How to use it is in `MANUAL.md`.
+Version 2.10.1. This guide installs the program. How to use it is in `MANUAL.md`.
 
 The commands are for **Windows** (PowerShell or Command Prompt). On Linux, use `/` instead of `\`,
 `python3` instead of `python`, and `.venv/bin/python` instead of `.venv\Scripts\python`.
@@ -149,3 +149,36 @@ The first start analyses all images in `input_images\` (about a second per image
 page opens ready for *Add images*. Then your browser opens
 **http://localhost:8000** (if not, type that address yourself). Stop the program with **Ctrl+C** in the terminal;
 your work is saved as you go. How to use the page is described in `MANUAL.md`.
+
+## 10. Installing on another computer
+
+Images, results and your review work are **not** part of the program (they are excluded from git), so a new
+computer starts with an empty image list. The settings are part of the program folder (`config\default.yaml`)
+and come along.
+
+**With GitHub** (recommended)
+
+On the computer you use now, in the program folder:
+
+```
+git add -A
+git commit -m "my settings and program"
+git push
+```
+
+`git add -A` is safe: images (`.tif`), `input_images\`, `output\` and the ground-truth images are excluded
+automatically. On the new computer, install Python (section 2), then:
+
+```
+git clone https://github.com/<your account>/<your repository>.git
+cd <your repository>
+git checkout <your branch>
+```
+
+and continue with sections 4 to 6 (virtual environment, packages, check).
+
+**Without GitHub**: unzip the program as in section 3. Start the review page, open **Settings**, and click
+**Import settings** with a file you saved on the other computer with **Export settings**.
+
+**Check it worked**: *Settings* shows a **settings fingerprint**; it must be the same on both computers. Then both
+count identically.

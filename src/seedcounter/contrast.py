@@ -15,7 +15,11 @@ def seedness(rgb_crop: np.ndarray, pod_mask: np.ndarray, seed_radius: float, cfg
     normalised for pale and dark pods alike.
     """
     cc = cfg["contrast"]
-    green = rgb_crop[..., 1].astype(np.float32)
+    if cc.get("channel", "green") == "saturation":
+        # seeds are strongly coloured, the pod wall pale: low (255 - saturation) behaves like "dark"
+        green = 255.0 - cv2.cvtColor(rgb_crop, cv2.COLOR_RGB2HSV)[..., 1].astype(np.float32)
+    else:
+        green = rgb_crop[..., 1].astype(np.float32)
     if cc["pre_blur"] > 0:
         green = cv2.GaussianBlur(green, (0, 0), cc["pre_blur"])
     filled = np.where(pod_mask, green, green[pod_mask].max())

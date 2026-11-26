@@ -21,7 +21,7 @@ pods:
   saturation_margin: 30         # saturation method only: pod = this much more saturated than the background
   min_area_frac: 0.2            # ignore objects smaller than 20 % of the largest pod
   left_body_frac: 0.6           # bud end: seeds start where the pod reaches 60 % of its width
-  right_body_frac: 0.6          # stem end: pod ends where its width drops below 60 %
+  right_body_frac: 0.65         # stem end: pod ends where its width drops below 65 % (pods include the pale wall)
   bud_frac: 0.5                 # never look for seeds within 0.5 pod widths of the bud tip
   end_margin: 1.0               # extra margin at both ends, in seed radii
   rim_frac: 0.03                # margin inside the pod wall, as a fraction of pod width
@@ -32,6 +32,7 @@ pods:
   touch_smoothness: 0.2         # how straight the seam between touching pods is kept
 
 contrast:
+  channel: green                # green = green channel (default); saturation = HSV saturation (stronger seeds, noisier wall)
   pre_blur: 1.5                  # Gaussian blur before contrast (pixels at work scale)
   background_size: 3.0          # size of the pod-background estimate, in seed radii
 
@@ -42,8 +43,8 @@ segmentation:
     aspects: [0.6, 0.7, 0.8]    # short / long axis ratios tried
     angles: 8                   # orientations tried (over 180 degrees)
     max_angle_to_pod: 30        # long axis at most this many degrees from the pod axis (90 = any)
-    surround: 1.45              # outer edge of the lighter ring around a seed, in ellipse radii
-    surround_weight: 0.6        # how much a dark ring counts against a match
+    surround: 1.3               # outer edge of the lighter ring around a seed, in ellipse radii
+    surround_weight: 0.8        # how much a dark ring counts against a match
     min_response: 0.02          # absolute minimum match strength
     relative_response: 0.3      # ... and at least this share of the pod's strong matches
     min_level: 0.06             # minimum darkness in the seed's core
@@ -51,7 +52,7 @@ segmentation:
     fill: 0.55                  # share of the ellipse that must be at least half as dark as its core
     core: 0.75                  # core = inner part of the ellipse (in ellipse radii) ...
     max_overlap: 0.3            # ... a candidate whose core is this much taken is the same seed
-  peak_sigma: 0.15              # smoothing for seed centres, in seed radii
+  peak_sigma: 0.1               # smoothing for seed centres, in seed radii
   dog_sigma: 1.0                # background scale for local contrast, in seed radii
   min_distance: 0.35            # peak search spacing, in seed radii (ellipse: overlap decides, not this)
   peak_contrast: 0.02           # minimum local contrast of a seed centre
